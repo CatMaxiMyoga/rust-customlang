@@ -2,6 +2,7 @@
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may 
 /// hold associated data relevant to that token type.
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     /// Represents an integer literal.
     Integer(i64),
@@ -24,6 +25,7 @@ pub enum TokenKind {
 }
 
 /// Represents a token with its kind and position in the source code. The kind contains the value.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     /// The kind (and potential value) of the token.
     pub kind: TokenKind,
