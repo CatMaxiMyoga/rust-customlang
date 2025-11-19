@@ -1,6 +1,6 @@
 /// This is temporary code for testing purposes.
 fn repl() {
-    use lexer::{Lexer, types as lexer_types};
+    use lexer::{Lexer, types::Token};
     use std::io::{self, Write};
 
     loop {
@@ -14,7 +14,7 @@ fn repl() {
 
         input = input[..input.len().saturating_sub(1)].to_string(); // Remove newline
         let mut lx: Lexer = Lexer::new(input);
-        let tokens: Result<Vec<lexer_types::Token>, String> = lx.tokenize();
+        let tokens: Result<Vec<Token>, String> = lx.tokenize();
 
         match tokens {
             Ok(toks) => {
