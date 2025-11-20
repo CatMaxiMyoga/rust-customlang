@@ -132,7 +132,6 @@ impl Parser {
                 self.advance();
                 let expr: Expression = self.parse_expression()?;
                 self.expect_token(&TokenKind::RightParen)?;
-                self.advance();
                 Ok(expr)
             }
             _ => Err(format!("Unexpected token: {:?}", token.kind)),
