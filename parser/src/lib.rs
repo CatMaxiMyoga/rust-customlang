@@ -62,12 +62,13 @@ impl Parser {
     fn expect_token(&mut self, kind: &lexer::types::TokenKind) -> Result<&Token, String> {
         if self.match_token(kind) {
             self.peek()
-        } else {
+        } else if let Ok(token) = self.peek() {
             Err(format!(
-                "Expected token {:?}, found {:?}",
-                kind,
-                self.peek().map(|t| &t.kind)
+                "Expected token '{:?}', found '{:?}'",
+                kind, token.kind
             ))
+        } else {
+            Err(format!("Expected token '{:?}', found end of input", kind))
         }
     }
 
@@ -155,4 +156,237 @@ impl Parser {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_addition() {
+        // 2 + 3.4
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(2), 0, 1),
+            Token::new(TokenKind::Plus, 0, 3),
+            Token::new(TokenKind::Float(3.4), 0, 5),
+            Token::new(TokenKind::EndOfFile, 0, 8),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Integer(2))),
+                operator: Operator::Add,
+                right: Box::new(Expression::Literal(Literal::Float(3.4))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn simple_subtraction() {
+        // 5.0 - 1
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Float(5.0), 0, 1),
+            Token::new(TokenKind::Minus, 0, 5),
+            Token::new(TokenKind::Integer(1), 0, 7),
+            Token::new(TokenKind::EndOfFile, 0, 8),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Float(5.0))),
+                operator: Operator::Subtract,
+                right: Box::new(Expression::Literal(Literal::Integer(1))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn simple_multiplication() {
+        // 4 * 2
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(4), 0, 1),
+            Token::new(TokenKind::Asterisk, 0, 3),
+            Token::new(TokenKind::Integer(2), 0, 5),
+            Token::new(TokenKind::EndOfFile, 0, 6),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Integer(4))),
+                operator: Operator::Multiply,
+                right: Box::new(Expression::Literal(Literal::Integer(2))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn simple_division() {
+        // 8 / 4.0
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(8), 0, 1),
+            Token::new(TokenKind::Slash, 0, 3),
+            Token::new(TokenKind::Float(4.0), 0, 5),
+            Token::new(TokenKind::EndOfFile, 0, 8),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Integer(8))),
+                operator: Operator::Divide,
+                right: Box::new(Expression::Literal(Literal::Float(4.0))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn integer_literal() {
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(42), 0, 1),
+            Token::new(TokenKind::EndOfFile, 0, 3),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Literal(
+                Literal::Integer(42),
+            ))],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn float_literal() {
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Float(3.24), 0, 1),
+            Token::new(TokenKind::EndOfFile, 0, 5),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Literal(Literal::Float(
+                3.24,
+            )))],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn parenthesized_addition() {
+        // (1 + 2)
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::LeftParen, 0, 1),
+            Token::new(TokenKind::Integer(1), 0, 2),
+            Token::new(TokenKind::Plus, 0, 4),
+            Token::new(TokenKind::Integer(2), 0, 6),
+            Token::new(TokenKind::RightParen, 0, 7),
+            Token::new(TokenKind::EndOfFile, 0, 8),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Integer(1))),
+                operator: Operator::Add,
+                right: Box::new(Expression::Literal(Literal::Integer(2))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn operator_precedence() {
+        // 2 + 3 * 4
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(2), 0, 1),
+            Token::new(TokenKind::Plus, 0, 3),
+            Token::new(TokenKind::Float(3.3), 0, 5),
+            Token::new(TokenKind::Asterisk, 0, 9),
+            Token::new(TokenKind::Integer(4), 0, 11),
+            Token::new(TokenKind::EndOfFile, 0, 12),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Literal(Literal::Integer(2))),
+                operator: Operator::Add,
+                right: Box::new(Expression::Binary {
+                    left: Box::new(Expression::Literal(Literal::Float(3.3))),
+                    operator: Operator::Multiply,
+                    right: Box::new(Expression::Literal(Literal::Integer(4))),
+                }),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn parenthesized_precedence() {
+        // (2.7 + 3) * 4
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::LeftParen, 0, 1),
+            Token::new(TokenKind::Float(2.7), 0, 2),
+            Token::new(TokenKind::Plus, 0, 6),
+            Token::new(TokenKind::Integer(3), 0, 8),
+            Token::new(TokenKind::RightParen, 0, 9),
+            Token::new(TokenKind::Asterisk, 0, 11),
+            Token::new(TokenKind::Integer(4), 0, 13),
+            Token::new(TokenKind::EndOfFile, 0, 14),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let program: Program = parser.parse().unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Binary {
+                left: Box::new(Expression::Binary {
+                    left: Box::new(Expression::Literal(Literal::Float(2.7))),
+                    operator: Operator::Add,
+                    right: Box::new(Expression::Literal(Literal::Integer(3))),
+                }),
+                operator: Operator::Multiply,
+                right: Box::new(Expression::Literal(Literal::Integer(4))),
+            })],
+        };
+        assert_eq!(program, expected);
+    }
+
+    // TODO : Add semicolons to force statement termination and update the parser accordingly.
+    // Currently failing, look at above TODO
+    #[ignore]
+    #[test]
+    fn consecutive_literals() {
+        // 1 2 3
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Integer(1), 0, 1),
+            Token::new(TokenKind::Integer(2), 0, 3),
+            Token::new(TokenKind::Integer(3), 0, 5),
+            Token::new(TokenKind::EndOfFile, 0, 6),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        // let result: String = parser.parse().err().unwrap();
+        // let expected_err: String = "...".to_string();
+        // assert_eq!(result, expected_err);
+        let result: Result<Program, String> = parser.parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn missing_right_paren() {
+        // (1 + 2
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::LeftParen, 0, 1),
+            Token::new(TokenKind::Integer(1), 0, 2),
+            Token::new(TokenKind::Plus, 0, 4),
+            Token::new(TokenKind::Integer(2), 0, 6),
+            Token::new(TokenKind::EndOfFile, 0, 7),
+        ];
+        let mut parser: Parser = Parser::new(tokens);
+        let result: String = parser.parse().err().unwrap();
+        let expected_err: String = "Expected token 'RightParen', found 'EndOfFile'".to_string();
+        assert_eq!(result, expected_err);
+    }
+}
