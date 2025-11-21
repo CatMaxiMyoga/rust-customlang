@@ -1,0 +1,16 @@
+Whitespace = " " | "\t" | "\n" | "\r" ;
+_ = { Whitespace } ;
+Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+Integer = Digit, { Digit } ;
+Float = [ Integer ], ".", Integer ;
+
+Literal = Integer | Float ;
+
+Expression = Term, { _, ("+" | "-"), _, Term } ;
+Term = Factor, { _, ("*" | "/"), _, Factor } ;
+Factor = Literal | "(", _, Expression, _, ")" ;
+
+Statement = _, Expression, _, ;
+
+Program = { Statement } ;
