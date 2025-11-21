@@ -73,7 +73,9 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
-        Ok(Statement::Expression(self.parse_expression()?))
+        let expr: Expression = self.parse_expression()?;
+        self.expect_token(&TokenKind::Semicolon)?;
+        Ok(Statement::Expression(expr))
     }
 
     fn parse_expression(&mut self) -> Result<Expression, String> {
@@ -161,12 +163,13 @@ mod tests {
 
     #[test]
     fn simple_addition() {
-        // 2 + 3.4
+        // 2 + 3.4;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Integer(2), 0, 1),
             Token::new(TokenKind::Plus, 0, 3),
             Token::new(TokenKind::Float(3.4), 0, 5),
-            Token::new(TokenKind::EndOfFile, 0, 8),
+            Token::new(TokenKind::Semicolon, 0, 8),
+            Token::new(TokenKind::EndOfFile, 0, 9),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -182,12 +185,13 @@ mod tests {
 
     #[test]
     fn simple_subtraction() {
-        // 5.0 - 1
+        // 5.0 - 1;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Float(5.0), 0, 1),
             Token::new(TokenKind::Minus, 0, 5),
             Token::new(TokenKind::Integer(1), 0, 7),
-            Token::new(TokenKind::EndOfFile, 0, 8),
+            Token::new(TokenKind::Semicolon, 0, 8),
+            Token::new(TokenKind::EndOfFile, 0, 9),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -203,12 +207,13 @@ mod tests {
 
     #[test]
     fn simple_multiplication() {
-        // 4 * 2
+        // 4 * 2;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Integer(4), 0, 1),
             Token::new(TokenKind::Asterisk, 0, 3),
             Token::new(TokenKind::Integer(2), 0, 5),
-            Token::new(TokenKind::EndOfFile, 0, 6),
+            Token::new(TokenKind::Semicolon, 0, 6),
+            Token::new(TokenKind::EndOfFile, 0, 7),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -224,12 +229,13 @@ mod tests {
 
     #[test]
     fn simple_division() {
-        // 8 / 4.0
+        // 8 / 4.0;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Integer(8), 0, 1),
             Token::new(TokenKind::Slash, 0, 3),
             Token::new(TokenKind::Float(4.0), 0, 5),
-            Token::new(TokenKind::EndOfFile, 0, 8),
+            Token::new(TokenKind::Semicolon, 0, 8),
+            Token::new(TokenKind::EndOfFile, 0, 9),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -245,9 +251,11 @@ mod tests {
 
     #[test]
     fn integer_literal() {
+        // 42;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Integer(42), 0, 1),
-            Token::new(TokenKind::EndOfFile, 0, 3),
+            Token::new(TokenKind::Semicolon, 0, 3),
+            Token::new(TokenKind::EndOfFile, 0, 4),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -261,9 +269,11 @@ mod tests {
 
     #[test]
     fn float_literal() {
+        // 3.24;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Float(3.24), 0, 1),
-            Token::new(TokenKind::EndOfFile, 0, 5),
+            Token::new(TokenKind::Semicolon, 0, 5),
+            Token::new(TokenKind::EndOfFile, 0, 6),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -277,14 +287,15 @@ mod tests {
 
     #[test]
     fn parenthesized_addition() {
-        // (1 + 2)
+        // (1 + 2);
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::LeftParen, 0, 1),
             Token::new(TokenKind::Integer(1), 0, 2),
             Token::new(TokenKind::Plus, 0, 4),
             Token::new(TokenKind::Integer(2), 0, 6),
             Token::new(TokenKind::RightParen, 0, 7),
-            Token::new(TokenKind::EndOfFile, 0, 8),
+            Token::new(TokenKind::Semicolon, 0, 8),
+            Token::new(TokenKind::EndOfFile, 0, 9),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -300,14 +311,15 @@ mod tests {
 
     #[test]
     fn operator_precedence() {
-        // 2 + 3 * 4
+        // 2 + 3 * 4;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::Integer(2), 0, 1),
             Token::new(TokenKind::Plus, 0, 3),
             Token::new(TokenKind::Float(3.3), 0, 5),
             Token::new(TokenKind::Asterisk, 0, 9),
             Token::new(TokenKind::Integer(4), 0, 11),
-            Token::new(TokenKind::EndOfFile, 0, 12),
+            Token::new(TokenKind::Semicolon, 0, 12),
+            Token::new(TokenKind::EndOfFile, 0, 13),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -327,7 +339,7 @@ mod tests {
 
     #[test]
     fn parenthesized_precedence() {
-        // (2.7 + 3) * 4
+        // (2.7 + 3) * 4;
         let tokens: Vec<Token> = vec![
             Token::new(TokenKind::LeftParen, 0, 1),
             Token::new(TokenKind::Float(2.7), 0, 2),
@@ -336,7 +348,8 @@ mod tests {
             Token::new(TokenKind::RightParen, 0, 9),
             Token::new(TokenKind::Asterisk, 0, 11),
             Token::new(TokenKind::Integer(4), 0, 13),
-            Token::new(TokenKind::EndOfFile, 0, 14),
+            Token::new(TokenKind::Semicolon, 0, 14),
+            Token::new(TokenKind::EndOfFile, 0, 15),
         ];
         let mut parser: Parser = Parser::new(tokens);
         let program: Program = parser.parse().unwrap();
@@ -354,9 +367,6 @@ mod tests {
         assert_eq!(program, expected);
     }
 
-    // TODO : Add semicolons to force statement termination and update the parser accordingly.
-    // Currently failing, look at above TODO
-    #[ignore]
     #[test]
     fn consecutive_literals() {
         // 1 2 3
@@ -367,11 +377,9 @@ mod tests {
             Token::new(TokenKind::EndOfFile, 0, 6),
         ];
         let mut parser: Parser = Parser::new(tokens);
-        // let result: String = parser.parse().err().unwrap();
-        // let expected_err: String = "...".to_string();
-        // assert_eq!(result, expected_err);
-        let result: Result<Program, String> = parser.parse();
-        assert!(result.is_err());
+        let result: String = parser.parse().err().unwrap();
+        let expected_err: String = "Expected token 'Semicolon', found 'Integer(2)'".to_string();
+        assert_eq!(result, expected_err);
     }
 
     #[test]
