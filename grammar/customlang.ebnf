@@ -11,6 +11,6 @@ Expression = Term, { _, ("+" | "-"), _, Term } ;
 Term = Factor, { _, ("*" | "/"), _, Factor } ;
 Factor = Literal | "(", _, Expression, _, ")" ;
 
-Statement = _, Expression, _, ;
+Statement = _, Expression, _, ";", _ ;
 
 Program = { Statement } ;

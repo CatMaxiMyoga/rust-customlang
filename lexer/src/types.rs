@@ -20,6 +20,8 @@ pub enum TokenKind {
     LeftParen,
     /// )
     RightParen,
+    /// ;
+    Semicolon,
     /// Represents the end of the source code.
     EndOfFile,
 }
