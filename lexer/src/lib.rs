@@ -44,6 +44,7 @@ impl Lexer {
                 '-' => Some(TokenKind::Minus),
                 '*' => Some(TokenKind::Asterisk),
                 '/' => Some(TokenKind::Slash),
+                ';' => Some(TokenKind::Semicolon),
                 _ => None,
             };
 
@@ -148,11 +149,12 @@ mod lexer_tests {
 
     #[test]
     fn simple_integer() {
-        let mut lexer: Lexer = Lexer::new(String::from("45"));
+        let mut lexer: Lexer = Lexer::new(String::from("45;"));
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(45), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 3),
+            Token::new(TokenKind::Semicolon, 1, 3),
+            Token::new(TokenKind::EndOfFile, 1, 4),
         ];
 
         assert_eq!(tokens, expected);
@@ -160,48 +162,56 @@ mod lexer_tests {
 
     #[test]
     fn simple_float() {
-        let mut lexer: Lexer = Lexer::new(String::from("1.2345"));
+        let mut lexer: Lexer = Lexer::new(String::from("1.2345;"));
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(1.2345), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 7),
+            Token::new(TokenKind::Semicolon, 1, 7),
+            Token::new(TokenKind::EndOfFile, 1, 8),
         ];
         assert_eq!(tokens, expected);
     }
 
     #[test]
     fn dot_starting_float() {
-        let mut lexer: Lexer = Lexer::new(String::from(".5678"));
+        let mut lexer: Lexer = Lexer::new(String::from(".5678;"));
         let result: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(0.5678), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 6),
+            Token::new(TokenKind::Semicolon, 1, 6),
+            Token::new(TokenKind::EndOfFile, 1, 7),
         ];
         assert_eq!(result, expected);
     }
 
     #[test]
     fn multiple_integers() {
-        let mut lexer: Lexer = Lexer::new(String::from("12 34 56"));
+        let mut lexer: Lexer = Lexer::new(String::from("12; 34; 56;"));
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(12), 1, 1),
-            Token::new(TokenKind::Integer(34), 1, 4),
-            Token::new(TokenKind::Integer(56), 1, 7),
-            Token::new(TokenKind::EndOfFile, 1, 9),
+            Token::new(TokenKind::Semicolon, 1, 3),
+            Token::new(TokenKind::Integer(34), 1, 5),
+            Token::new(TokenKind::Semicolon, 1, 7),
+            Token::new(TokenKind::Integer(56), 1, 9),
+            Token::new(TokenKind::Semicolon, 1, 11),
+            Token::new(TokenKind::EndOfFile, 1, 12),
         ];
         assert_eq!(tokens, expected);
     }
 
     #[test]
     fn multiple_floats() {
-        let mut lexer: Lexer = Lexer::new(String::from("1.1 2.2 3.3"));
+        let mut lexer: Lexer = Lexer::new(String::from("1.1; 2.2; 3.3;"));
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(1.1), 1, 1),
-            Token::new(TokenKind::Float(2.2), 1, 5),
-            Token::new(TokenKind::Float(3.3), 1, 9),
-            Token::new(TokenKind::EndOfFile, 1, 12),
+            Token::new(TokenKind::Semicolon, 1, 4),
+            Token::new(TokenKind::Float(2.2), 1, 6),
+            Token::new(TokenKind::Semicolon, 1, 9),
+            Token::new(TokenKind::Float(3.3), 1, 11),
+            Token::new(TokenKind::Semicolon, 1, 14),
+            Token::new(TokenKind::EndOfFile, 1, 15),
         ];
         assert_eq!(tokens, expected);
     }
