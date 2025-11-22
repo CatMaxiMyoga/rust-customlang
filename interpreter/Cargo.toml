@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 parser = { path = "../parser" }
+paste = "1.0.15"
 
 [lints]
 workspace = true
