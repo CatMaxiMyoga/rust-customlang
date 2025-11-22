@@ -45,7 +45,8 @@ impl Token {
     /// * `kind` - The kind of the token.
     /// * `line` - The line number where the token is located.
     /// * `column` - The column number where the token is located.
-    pub fn new(kind: TokenKind, line: usize, column: usize) -> Self {
-        Token { kind, line, column }
+    #[must_use]
+    pub const fn new(kind: TokenKind, line: usize, column: usize) -> Self {
+        Self { kind, line, column }
     }
 }

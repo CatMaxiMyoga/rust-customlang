@@ -6,5 +6,5 @@ edition = "2024"
 [dependencies]
 lexer = { path = "../lexer" }
 
-[lints.rust]
-missing_docs = "deny"
+[lints]
+workspace = true
