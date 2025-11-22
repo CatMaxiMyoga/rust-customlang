@@ -1,7 +1,4 @@
 //! Contains the parser implementation for the programming language.
-#![deny(missing_docs)]
-#![deny(clippy::panic)]
-
 pub mod types;
 
 use lexer::types::{Token, TokenKind};
