@@ -17,11 +17,15 @@ impl Parser {
     /// # Arguments
     ///
     /// * `tokens` - The tokens to be parsed.
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, index: 0 }
+    #[must_use]
+    pub const fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, index: 0 }
     }
 
     /// Parses the tokens and returns the root of the AST.
+    ///
+    /// # Errors
+    /// Unexpected end of input or invalid syntax.
     pub fn parse(&mut self) -> Result<Program, String> {
         let mut statements: Vec<Statement> = Vec::new();
 
@@ -32,17 +36,17 @@ impl Parser {
         Ok(Program { statements })
     }
 
-    fn is_eof(&mut self) -> Result<bool, String> {
+    fn is_eof(&self) -> Result<bool, String> {
         Ok(matches!(self.peek()?.kind, TokenKind::EndOfFile))
     }
 
-    fn peek(&mut self) -> Result<&Token, String> {
+    fn peek(&self) -> Result<&Token, String> {
         self.tokens
             .get(self.index)
-            .ok_or("Unexpected end of input".to_string())
+            .ok_or_else(|| "Unexpected end of input".to_string())
     }
 
-    fn advance(&mut self) {
+    const fn advance(&mut self) {
         self.index += 1;
     }
 
@@ -65,7 +69,7 @@ impl Parser {
                 kind, token.kind
             ))
         } else {
-            Err(format!("Expected token '{:?}', found end of input", kind))
+            Err(format!("Expected token '{kind:?}', found end of input"))
         }
     }
 
@@ -79,7 +83,7 @@ impl Parser {
         self.parse_precedence(0)
     }
 
-    fn operator_precedence(kind: &TokenKind) -> Option<u8> {
+    const fn operator_precedence(kind: &TokenKind) -> Option<u8> {
         match kind {
             TokenKind::Asterisk | TokenKind::Slash => Some(2),
             TokenKind::Plus | TokenKind::Minus => Some(1),
@@ -90,14 +94,10 @@ impl Parser {
     fn parse_precedence(&mut self, min_prec: u8) -> Result<Expression, String> {
         let mut left: Expression = self.parse_primary()?;
 
-        loop {
-            let next: Result<&Token, String> = self.peek();
-            if next.is_err() {
-                break;
-            }
-            let op_token: Token = next.unwrap().clone();
+        while let Ok(next) = self.peek() {
+            let op_token: Token = next.clone();
 
-            let prec: u8 = match Parser::operator_precedence(&op_token.kind) {
+            let prec: u8 = match Self::operator_precedence(&op_token.kind) {
                 Some(p) if p >= min_prec => p,
                 _ => break,
             };
@@ -155,6 +155,7 @@ impl Parser {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
