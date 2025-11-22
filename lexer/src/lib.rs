@@ -17,8 +17,9 @@ impl Lexer {
     /// # Arguments
     ///
     /// * `source` - The source code to be tokenized.
-    pub fn new(source: String) -> Self {
-        Lexer {
+    #[must_use]
+    pub fn new(source: &str) -> Self {
+        Self {
             source: source.chars().collect(),
             index: 0,
             line: 1,
@@ -28,6 +29,12 @@ impl Lexer {
 
     /// Tokenizes the source code and returns a vector of tokens. The Lexer must be mutable to keep
     /// track of its position in the source code.
+    ///
+    /// # Errors
+    /// If invalid characters or number formats are encountered.
+    ///
+    /// # Panics
+    /// Only panics if internal assumptions are violated.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, String> {
         let mut tokens: Vec<Token> = vec![];
 
@@ -141,12 +148,14 @@ impl Lexer {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod lexer_tests {
     use super::*;
 
+
     #[test]
     fn simple_integer() {
-        let mut lexer: Lexer = Lexer::new(String::from("45;"));
+        let mut lexer: Lexer = Lexer::new("45;");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(45), 1, 1),
@@ -159,7 +168,7 @@ mod lexer_tests {
 
     #[test]
     fn simple_float() {
-        let mut lexer: Lexer = Lexer::new(String::from("1.2345;"));
+        let mut lexer: Lexer = Lexer::new("1.2345;");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(1.2345), 1, 1),
@@ -171,7 +180,7 @@ mod lexer_tests {
 
     #[test]
     fn dot_starting_float() {
-        let mut lexer: Lexer = Lexer::new(String::from(".5678;"));
+        let mut lexer: Lexer = Lexer::new(".5678;");
         let result: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(0.5678), 1, 1),
@@ -183,7 +192,7 @@ mod lexer_tests {
 
     #[test]
     fn multiple_integers() {
-        let mut lexer: Lexer = Lexer::new(String::from("12; 34; 56;"));
+        let mut lexer: Lexer = Lexer::new("12; 34; 56;");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(12), 1, 1),
@@ -199,7 +208,7 @@ mod lexer_tests {
 
     #[test]
     fn multiple_floats() {
-        let mut lexer: Lexer = Lexer::new(String::from("1.1; 2.2; 3.3;"));
+        let mut lexer: Lexer = Lexer::new("1.1; 2.2; 3.3;");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Float(1.1), 1, 1),
@@ -215,7 +224,7 @@ mod lexer_tests {
 
     #[test]
     fn single_letter_tokens() {
-        let mut lexer: Lexer = Lexer::new(String::from("()+-*/"));
+        let mut lexer: Lexer = Lexer::new("()+-*/");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::LeftParen, 1, 1),
@@ -231,7 +240,7 @@ mod lexer_tests {
 
     #[test]
     fn multiline() {
-        let mut lexer: Lexer = Lexer::new(String::from("314\n159"));
+        let mut lexer: Lexer = Lexer::new("314\n159");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(314), 1, 1),
@@ -243,7 +252,7 @@ mod lexer_tests {
 
     #[test]
     fn excessive_whitespace() {
-        let mut lexer: Lexer = Lexer::new(String::from("  7\t\t8  \n  9 "));
+        let mut lexer: Lexer = Lexer::new("  7\t\t8  \n  9 ");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(7), 1, 3),
@@ -256,7 +265,7 @@ mod lexer_tests {
 
     #[test]
     fn simple_arithmetic_expression() {
-        let mut lexer: Lexer = Lexer::new(String::from("3 + 4.5 * (2 - 1) / 6"));
+        let mut lexer: Lexer = Lexer::new("3 + 4.5 * (2 - 1) / 6");
         let tokens: Vec<Token> = lexer.tokenize().unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Integer(3), 1, 1),
@@ -277,7 +286,7 @@ mod lexer_tests {
 
     #[test]
     fn invalid_number_format() {
-        let mut lexer: Lexer = Lexer::new(String::from("12.34.56"));
+        let mut lexer: Lexer = Lexer::new("12.34.56");
         let result: Result<Vec<Token>, String> = lexer.tokenize();
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "Invalid Number Format at 1:6");
