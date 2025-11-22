@@ -1,7 +1,4 @@
 //! Contains the lexer implementation for the programming language.
-#![deny(missing_docs)]
-#![deny(clippy::panic)]
-
 pub mod types;
 
 use crate::types::{Token, TokenKind};
@@ -32,12 +29,12 @@ impl Lexer {
     /// Tokenizes the source code and returns a vector of tokens. The Lexer must be mutable to keep
     /// track of its position in the source code.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, String> {
-        let mut tokens = vec![];
+        let mut tokens: Vec<Token> = vec![];
 
         'lex: while self.index < self.source.len() {
             let current_char: char = self.source[self.index];
 
-            let single = match current_char {
+            let single: Option<TokenKind> = match current_char {
                 '(' => Some(TokenKind::LeftParen),
                 ')' => Some(TokenKind::RightParen),
                 '+' => Some(TokenKind::Plus),

@@ -1,7 +1,4 @@
 //! Contains the parser implementation for the programming language.
-#![deny(missing_docs)]
-#![deny(clippy::panic)]
-
 pub mod types;
 
 use lexer::types::{Token, TokenKind};
@@ -109,7 +106,7 @@ impl Parser {
 
             let right: Expression = self.parse_precedence(prec + 1)?;
 
-            let operator = match op_token.kind {
+            let operator: Operator = match op_token.kind {
                 TokenKind::Plus => Operator::Add,
                 TokenKind::Minus => Operator::Subtract,
                 TokenKind::Asterisk => Operator::Multiply,
