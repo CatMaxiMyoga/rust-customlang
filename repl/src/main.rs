@@ -1,12 +1,12 @@
+#![allow(missing_docs)]
+
 use parser::{Parser, types::Program};
 
-/// This is temporary code for testing purposes.
-fn repl() {
+fn main() {
     use lexer::{Lexer, types::Token};
     use std::io::{self, Write};
 
     loop {
-        // Get user input
         print!(">> ");
         let _ = io::stdout().flush();
         let mut input = String::new();
@@ -15,14 +15,14 @@ fn repl() {
         }
 
         input = input[..input.len().saturating_sub(1)].to_string(); // Remove newline
-        let mut l: Lexer = Lexer::new(input);
+        let mut l: Lexer = Lexer::new(&input);
         let tokens: Result<Vec<Token>, String> = l.tokenize();
 
         match tokens {
             Ok(toks) => {
                 println!("\nTokens:");
-                for tok in toks.iter() {
-                    println!("{:?}", tok);
+                for tok in &toks {
+                    println!("{tok:?}");
                 }
 
                 let mut p: Parser = Parser::new(toks);
@@ -31,22 +31,18 @@ fn repl() {
                 match ast {
                     Ok(program) => {
                         println!("\nAST:");
-                        for stmt in program.statements.iter() {
-                            println!("{:?}", stmt);
+                        for stmt in &program.statements {
+                            println!("{stmt:?}");
                         }
                     }
                     Err(e) => {
-                        println!("Parser error: {}", e);
+                        println!("Parser error: {e}");
                     }
                 }
             }
             Err(e) => {
-                println!("Lexer error: {}", e);
+                println!("Lexer error: {e}");
             }
         }
     }
-}
-
-fn main() {
-    repl();
 }
