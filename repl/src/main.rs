@@ -1,15 +1,16 @@
 #![allow(missing_docs)]
 
+use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
+use interpreter::Interpreter;
+use std::io::{self, Write};
 
 fn main() {
-    use lexer::{Lexer, types::Token};
-    use std::io::{self, Write};
 
     loop {
-        print!(">> ");
+        print!("\n>> ");
         let _ = io::stdout().flush();
-        let mut input = String::new();
+        let mut input: String = String::new();
         if io::stdin().read_line(&mut input).is_err() {
             continue;
         }
@@ -34,6 +35,9 @@ fn main() {
                         for stmt in &program.statements {
                             println!("{stmt:?}");
                         }
+
+                        println!("\nInterpreter Output:");
+                        Interpreter::run(program);
                     }
                     Err(e) => {
                         println!("Parser error: {e}");
