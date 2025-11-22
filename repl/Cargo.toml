@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 lexer = { path = "../lexer" }
 parser = { path = "../parser" }
+interpreter = { path = "../interpreter" }
 
 [lints]
 workspace = true
