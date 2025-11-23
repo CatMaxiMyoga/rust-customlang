@@ -1,16 +1,26 @@
-Whitespace = " " | "\t" | "\n" | "\r" ;
-_ = { Whitespace } ;
+W = " " | "\t" | "\n" | "\r" ;
+_ = { W } ;
+
 Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+Lowercase = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o"
+  | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+Uppercase = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O"
+  | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z";
+Letter = Lowercase | Uppercase ;
 
 Integer = Digit, { Digit } ;
 Float = [ Integer ], ".", Integer ;
+
+Identifier = Letter, { Letter | Digit | "_" } ;
 
 Literal = Integer | Float ;
 
 Expression = Term, { _, ("+" | "-"), _, Term } ;
 Term = Factor, { _, ("*" | "/"), _, Factor } ;
-Factor = Literal | "(", _, Expression, _, ")" ;
+Factor = Literal | Identifier | "(", _, Expression, _, ")" ;
 
-Statement = _, Expression, _, ";", _ ;
+VariableDeclaration = "let", W, _, Identifier, _, "=", _, Expression ;
+
+Statement = _, (VariableDeclaration | Expression), _, ";", _ ;
 
 Program = { Statement } ;
