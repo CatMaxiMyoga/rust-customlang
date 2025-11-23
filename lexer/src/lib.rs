@@ -334,4 +334,52 @@ mod lexer_tests {
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "Invalid Number Format at 1:6");
     }
+
+    #[test]
+    fn identifier() {
+        let mut lexer: Lexer = Lexer::new("Hello");
+        let result: Vec<Token> = lexer.tokenize().unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Identifier(String::from("Hello")), 1, 1),
+            Token::new(TokenKind::EndOfFile, 1, 6),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn identifier_with_number() {
+        let mut lexer: Lexer = Lexer::new("var123");
+        let result: Vec<Token> = lexer.tokenize().unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Identifier(String::from("var123")), 1, 1),
+            Token::new(TokenKind::EndOfFile, 1, 7),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn keyword_let() {
+        let mut lexer: Lexer = Lexer::new("let");
+        let result: Vec<Token> = lexer.tokenize().unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Keyword(Keyword::Let), 1, 1),
+            Token::new(TokenKind::EndOfFile, 1, 4),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn variable_assignment() {
+        let mut lexer: Lexer = Lexer::new("let x = 10;");
+        let result: Vec<Token> = lexer.tokenize().unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Keyword(Keyword::Let), 1, 1),
+            Token::new(TokenKind::Identifier(String::from("x")), 1, 5),
+            Token::new(TokenKind::Equals, 1, 7),
+            Token::new(TokenKind::Integer(10), 1, 9),
+            Token::new(TokenKind::Semicolon, 1, 11),
+            Token::new(TokenKind::EndOfFile, 1, 12),
+        ];
+        assert_eq!(result, expected);
+    }
 }
