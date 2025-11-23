@@ -2,6 +2,9 @@
 
 use std::ops::{Add, Div, Mul, Sub};
 
+/// Represents the environment mapping variable names to their values.
+pub type Environment = std::collections::HashMap<String, Option<Value>>;
+
 /// Represents all types of values Expressions can return when evaluated.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
