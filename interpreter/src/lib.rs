@@ -29,7 +29,7 @@ impl<'a> Interpreter<'a> {
     }
 
     #[cfg(test)]
-    pub(crate) const fn new(environment: &'a mut Environment) -> Self {
+    const fn new(environment: &'a mut Environment) -> Self {
         Self { environment }
     }
 
@@ -70,7 +70,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    pub(crate) fn expression(&mut self, expression: Expression) -> Result<Value, String> {
+    fn expression(&mut self, expression: Expression) -> Result<Value, String> {
         match expression {
             Expression::Literal(literal) => Ok(Self::literal_expression(&literal)),
             Expression::Binary {
@@ -117,6 +117,7 @@ impl<'a> Interpreter<'a> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -184,4 +185,83 @@ mod tests {
         Value::Float(10.0),
         Value::Float(2.5)
     );
+
+    #[test]
+    fn variable_declaration() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let declaration: Statement = Statement::VariableDeclaration {
+            name: String::from("x"),
+            value: None,
+        };
+        interpreter.statement(declaration).unwrap();
+        assert!(environment.contains_key("x"));
+        assert!(environment["x"].is_none());
+    }
+
+    #[test]
+    fn variable_initialization() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let declaration: Statement = Statement::VariableDeclaration {
+            name: String::from("x"),
+            value: Some(Expression::Literal(Literal::Integer(10))),
+        };
+        interpreter.statement(declaration).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Integer(10)));
+    }
+
+    #[test]
+    fn variable_delayed_initialization() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), None);
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Float(20.0)),
+        };
+        interpreter.statement(assignment).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Float(20.0)));
+    }
+
+    #[test]
+    fn variable_reassignment() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Integer(30)),
+        };
+        interpreter.statement(assignment).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Integer(30)));
+    }
+
+    #[test]
+    fn variable_type_mismatch() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Float(20.0)),
+        };
+        let result: Result<(), String> = interpreter.statement(assignment);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Type mismatch in assignment to variable 'x'"
+        );
+    }
 }
