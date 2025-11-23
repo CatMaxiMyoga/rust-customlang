@@ -1,7 +1,7 @@
 //! Contains the parser implementation for the programming language.
 pub mod types;
 
-use lexer::types::{Token, TokenKind};
+use lexer::types::{Keyword, Token, TokenKind};
 
 use crate::types::{Expression, Literal, Operator, Program, Statement};
 
@@ -73,10 +73,72 @@ impl Parser {
         }
     }
 
+    fn is_assignment(&self) -> bool {
+        if let Some(token) = self.tokens.get(self.index)
+            && let TokenKind::Identifier(_) = token.kind
+        {
+            return self
+                .tokens
+                .get(self.index + 1)
+                .map_or_else(|| false, |t| t.kind == TokenKind::Equals);
+        }
+        false
+    }
+
     fn parse_statement(&mut self) -> Result<Statement, String> {
+        if self.match_token(&TokenKind::Keyword(Keyword::Let)) {
+            return self.parse_variable_declaration();
+        } else if self.is_assignment() {
+            return self.parse_variable_assignment();
+        }
         let expr: Expression = self.parse_expression()?;
         self.expect_token(&TokenKind::Semicolon)?;
         Ok(Statement::Expression(expr))
+    }
+
+    fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
+        let identifier: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            token => {
+                return Err(format!(
+                    "Expected identifier after 'let', found '{token:?}'"
+                ));
+            }
+        };
+        self.advance();
+
+        let value: Option<Expression> = if self.match_token(&TokenKind::Equals) {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+
+        self.expect_token(&TokenKind::Semicolon)?;
+        Ok(Statement::VariableDeclaration {
+            name: identifier,
+            value,
+        })
+    }
+
+    fn parse_variable_assignment(&mut self) -> Result<Statement, String> {
+        let identifier: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => {
+                unreachable!("Checked for identifier token before")
+            }
+        };
+
+        self.advance();
+        self.expect_token(&TokenKind::Equals)?;
+
+        let value: Expression = self.parse_expression()?;
+
+        self.expect_token(&TokenKind::Semicolon)?;
+
+        Ok(Statement::VariableAssignment {
+            name: identifier,
+            value,
+        })
     }
 
     fn parse_expression(&mut self) -> Result<Expression, String> {
@@ -133,6 +195,10 @@ impl Parser {
                 let expr: Expression = self.parse_expression()?;
                 self.expect_token(&TokenKind::RightParen)?;
                 Ok(expr)
+            }
+            TokenKind::Identifier(identifier) => {
+                self.advance();
+                Ok(Expression::Identifier(identifier))
             }
             _ => Err(format!("Unexpected token: {:?}", token.kind)),
         }

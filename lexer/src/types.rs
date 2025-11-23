@@ -1,5 +1,12 @@
 //! Contains the types used in the lexer implementation.
 
+/// Defines the different keywords recognized by the lexer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Keyword {
+    /// Let keyword, used for variable declarations.
+    Let,
+}
+
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may 
 /// hold associated data relevant to that token type.
 #[derive(Debug, Clone, PartialEq)]
@@ -20,8 +27,14 @@ pub enum TokenKind {
     LeftParen,
     /// )
     RightParen,
+    /// =
+    Equals,
     /// ;
     Semicolon,
+    /// Represents an identifier.
+    Identifier(String),
+    /// Represents a keyword.
+    Keyword(Keyword),
     /// Represents the end of the source code.
     EndOfFile,
 }

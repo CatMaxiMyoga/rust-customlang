@@ -2,10 +2,11 @@
 
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
-use interpreter::Interpreter;
+use interpreter::{Interpreter, types::Environment};
 use std::io::{self, Write};
 
 fn main() {
+    let mut environment: Environment = Environment::new();
 
     loop {
         print!("\n>> ");
@@ -37,7 +38,9 @@ fn main() {
                         }
 
                         println!("\nInterpreter Output:");
-                        Interpreter::run(program);
+                        Interpreter::run(program, &mut environment).unwrap_or_else(|e| {
+                            println!("Interpreter error: {e}");
+                        });
                     }
                     Err(e) => {
                         println!("Parser error: {e}");

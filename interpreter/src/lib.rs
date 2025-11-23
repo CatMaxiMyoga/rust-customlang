@@ -2,38 +2,92 @@
 
 pub mod types;
 
+use std::mem::discriminant;
+
 use parser::types::{Expression, Literal, Operator, Program, Statement};
 use types::Value;
 
-/// The interpreter for the programming language.
-pub struct Interpreter;
+use crate::types::Environment;
 
-impl Interpreter {
+/// The interpreter for the programming language.
+pub struct Interpreter<'a> {
+    environment: &'a mut Environment,
+}
+
+impl<'a> Interpreter<'a> {
     /// Interprets the AST and executes the program.
-    pub fn run(program: Program) {
+    ///
+    /// # Errors
+    /// Errors if runtime errors.
+    pub fn run(program: Program, environment: &'a mut Environment) -> Result<(), String> {
+        let mut interpreter: Self = Self { environment };
         for statement in program.statements {
-            Self::statement(statement);
+            interpreter.statement(statement)?;
         }
+
+        Ok(())
     }
 
-    fn statement(statement: Statement) {
+    #[cfg(test)]
+    const fn new(environment: &'a mut Environment) -> Self {
+        Self { environment }
+    }
+
+    fn statement(&mut self, statement: Statement) -> Result<(), String> {
         match statement {
             Statement::Expression(expr) => {
                 // TEMP: prints the result of expression statements
-                let expression_result: Value = Self::expression(expr);
+                let expression_result: Value = self.expression(expr)?;
                 println!("{expression_result:?}");
             }
+            Statement::VariableDeclaration { name, value } => {
+                let value: Option<Value> = if let Some(expr) = value {
+                    Some(self.expression(expr)?)
+                } else {
+                    None
+                };
+                self.environment.insert(name, value);
+            }
+            Statement::VariableAssignment { name, value } => {
+                let old: Option<Value> = if let Some(val) = self.environment.get(&name) {
+                    val.clone()
+                } else {
+                    return Err(format!("Variable '{name}' not declared"));
+                };
+
+                let value: Value = self.expression(value)?;
+
+                if let Some(old) = old
+                    && discriminant(&old) != discriminant(&value)
+                {
+                    return Err(format!("Type mismatch in assignment to variable '{name}'"));
+                }
+
+                self.environment.insert(name, Some(value));
+            }
         }
+
+        Ok(())
     }
 
-    pub(crate) fn expression(expression: Expression) -> Value {
+    fn expression(&mut self, expression: Expression) -> Result<Value, String> {
         match expression {
-            Expression::Literal(literal) => Self::literal_expression(&literal),
+            Expression::Literal(literal) => Ok(Self::literal_expression(&literal)),
             Expression::Binary {
                 left,
                 operator,
                 right,
-            } => Self::binary_expression(*left, &operator, *right),
+            } => self.binary_expression(*left, &operator, *right),
+            Expression::Identifier(identifier) => {
+                if self.environment.contains_key(&identifier) {
+                    self.environment[&identifier].as_ref().map_or_else(
+                        || Err(String::from("Variable '{identifier}' is uninitialized")),
+                        |value| Ok(value.clone()),
+                    )
+                } else {
+                    Err(format!("Variable '{identifier}' not declared"))
+                }
+            }
         }
     }
 
@@ -44,20 +98,26 @@ impl Interpreter {
         }
     }
 
-    fn binary_expression(left: Expression, operator: &Operator, right: Expression) -> Value {
-        let left: Value = Self::expression(left);
-        let right: Value = Self::expression(right);
+    fn binary_expression(
+        &mut self,
+        left: Expression,
+        operator: &Operator,
+        right: Expression,
+    ) -> Result<Value, String> {
+        let left: Value = self.expression(left)?;
+        let right: Value = self.expression(right)?;
 
-        match operator {
+        Ok(match operator {
             Operator::Add => left + right,
             Operator::Subtract => left - right,
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
-        }
+        })
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -66,12 +126,14 @@ mod tests {
             paste::paste! {
                 #[test]
                 fn [<$name _ $suffix>]() {
+                    let mut environment: Environment = Environment::new();
+                    let mut interpreter: Interpreter = Interpreter::new(&mut environment);
                     let expression: Expression = Expression::Binary{
                         left: Box::new($left),
                         operator: Operator::$op,
                         right: Box::new($right)
                     };
-                    let result: Value = Interpreter::expression(expression);
+                    let result: Value = interpreter.expression(expression).unwrap();
                     assert_eq!(result, $result);
                 }
             }
@@ -123,4 +185,83 @@ mod tests {
         Value::Float(10.0),
         Value::Float(2.5)
     );
+
+    #[test]
+    fn variable_declaration() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let declaration: Statement = Statement::VariableDeclaration {
+            name: String::from("x"),
+            value: None,
+        };
+        interpreter.statement(declaration).unwrap();
+        assert!(environment.contains_key("x"));
+        assert!(environment["x"].is_none());
+    }
+
+    #[test]
+    fn variable_initialization() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let declaration: Statement = Statement::VariableDeclaration {
+            name: String::from("x"),
+            value: Some(Expression::Literal(Literal::Integer(10))),
+        };
+        interpreter.statement(declaration).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Integer(10)));
+    }
+
+    #[test]
+    fn variable_delayed_initialization() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), None);
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Float(20.0)),
+        };
+        interpreter.statement(assignment).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Float(20.0)));
+    }
+
+    #[test]
+    fn variable_reassignment() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Integer(30)),
+        };
+        interpreter.statement(assignment).unwrap();
+
+        assert!(environment.contains_key("x"));
+        assert_eq!(environment["x"], Some(Value::Integer(30)));
+    }
+
+    #[test]
+    fn variable_type_mismatch() {
+        let mut environment: Environment = Environment::new();
+        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let assignment: Statement = Statement::VariableAssignment {
+            name: String::from("x"),
+            value: Expression::Literal(Literal::Float(20.0)),
+        };
+        let result: Result<(), String> = interpreter.statement(assignment);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Type mismatch in assignment to variable 'x'"
+        );
+    }
 }

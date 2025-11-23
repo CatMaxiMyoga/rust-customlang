@@ -27,6 +27,8 @@ pub enum Operator {
 pub enum Expression {
     /// A literal expression.
     Literal(Literal),
+    /// An identifier expression.
+    Identifier(String),
     /// A binary expression.
     Binary {
         /// The left-hand side expression.
@@ -41,6 +43,20 @@ pub enum Expression {
 /// Represents statements in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
+    /// A variable declaration statement.
+    VariableDeclaration {
+        /// The name of the variable.
+        name: String,
+        /// The initial value of the variable.
+        value: Option<Expression>,
+    },
+    /// Variable assignment statement.
+    VariableAssignment {
+        /// The name of the variable.
+        name: String,
+        /// The new value of the variable.
+        value: Expression,
+    },
     /// An expression statement.
     Expression(Expression),
 }
