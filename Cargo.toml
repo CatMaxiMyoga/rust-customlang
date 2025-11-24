@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["interpreter","lexer", "parser", "repl"]
+members = ["interpreter", "lang","lexer", "parser", "repl"]
 
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }

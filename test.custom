@@ -1,0 +1,10 @@
+let x = 5;
+let y = 10.0;
+let z = "Hello, World!";
+let a = true;
+
+x; y; z; a;
+
+y = x * y;
+
+y;

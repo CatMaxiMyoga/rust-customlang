@@ -222,7 +222,6 @@ impl Lexer {
             self.column += 1;
         }
 
-        dbg!(self.index, self.source.len(), &string_vec);
         if self.index >= self.source.len() {
             return Err(format!(
                 "Unterminated string starting at {}:{}",
