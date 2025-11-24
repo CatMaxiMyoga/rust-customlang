@@ -213,6 +213,10 @@ impl Parser {
                 self.advance();
                 Ok(Expression::Literal(Literal::String(value.clone())))
             }
+            TokenKind::Boolean(value) => {
+                self.advance();
+                Ok(Expression::Literal(Literal::Boolean(*value)))
+            }
             _ => Err(format!("Expected literal, found {:?}", token.kind)),
         }
     }
