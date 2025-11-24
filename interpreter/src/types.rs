@@ -75,6 +75,8 @@ pub enum RuntimeValue {
     Float(f64),
     /// A string value.
     String(String),
+    /// A boolean value.
+    Boolean(bool),
 }
 
 impl RuntimeValue {
@@ -83,6 +85,7 @@ impl RuntimeValue {
             Self::Integer(_) => &IntegerOperations,
             Self::Float(_) => &FloatOperations,
             Self::String(_) => &StringOperations,
+            Self::Boolean(_) => &BooleanOperations,
         }
     }
 }
@@ -125,7 +128,7 @@ impl Operations for IntegerOperations {
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs + rhs)),
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 + rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot add Integer with non-numeric type".to_string(),
             )),
         }
@@ -139,7 +142,7 @@ impl Operations for IntegerOperations {
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs - rhs)),
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 - rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot subtract Integer with non-numeric type".to_string(),
             )),
         }
@@ -153,7 +156,7 @@ impl Operations for IntegerOperations {
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs * rhs)),
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 * rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot multiply Integer with non-numeric type".to_string(),
             )),
         }
@@ -179,7 +182,7 @@ impl Operations for IntegerOperations {
                     Ok(RuntimeValue::Float(*lhs as f64 / rhs))
                 }
             }
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot divide Integer with non-numeric type".to_string(),
             )),
         }
@@ -196,7 +199,7 @@ impl Operations for FloatOperations {
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs + *rhs as f64)),
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs + rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot add Float with non-numeric type".to_string(),
             )),
         }
@@ -210,7 +213,7 @@ impl Operations for FloatOperations {
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs - *rhs as f64)),
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs - rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot subtract Float with non-numeric type".to_string(),
             )),
         }
@@ -224,7 +227,7 @@ impl Operations for FloatOperations {
             #[allow(clippy::cast_precision_loss)]
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs * *rhs as f64)),
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs * rhs)),
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot multiply Float with non-numeric type".to_string(),
             )),
         }
@@ -250,7 +253,7 @@ impl Operations for FloatOperations {
                     Ok(RuntimeValue::Float(lhs / rhs))
                 }
             }
-            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+            RuntimeValue::String(_) | RuntimeValue::Boolean(_) => Err(RuntimeError::IllegalOperation(
                 "Cannot divide Float with non-numeric type".to_string(),
             )),
         }
@@ -286,6 +289,30 @@ impl Operations for StringOperations {
     fn div(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
         Err(RuntimeError::IllegalOperation(
             "Division not supported for String type".to_string(),
+        ))
+    }
+}
+
+struct BooleanOperations;
+impl Operations for BooleanOperations {
+    fn add(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Addition not supported for Boolean type".to_string(),
+        ))
+    }
+    fn sub(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Subtraction not supported for Boolean type".to_string(),
+        ))
+    }
+    fn mul(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Multiplication not supported for Boolean type".to_string(),
+        ))
+    }
+    fn div(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Division not supported for Boolean type".to_string(),
         ))
     }
 }

@@ -9,6 +9,8 @@ pub enum Literal {
     Float(f64),
     /// A string literal.
     String(String),
+    /// A boolean literal.
+    Boolean(bool),
 }
 
 /// Represents operators.

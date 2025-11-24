@@ -17,6 +17,8 @@ pub enum TokenKind {
     Float(f64),
     /// Represents a string literal.
     String(String),
+    /// Represents a boolean literal. [true | false]
+    Boolean(bool),
     /// +
     Plus,
     /// -

@@ -181,9 +181,10 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expression, String> {
         let token: Token = self.peek()?.clone();
         match token.kind {
-            TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::String(_) => {
-                self.parse_literal()
-            }
+            TokenKind::Integer(_)
+            | TokenKind::Float(_)
+            | TokenKind::String(_)
+            | TokenKind::Boolean(_) => self.parse_literal(),
             TokenKind::LeftParen => {
                 self.advance();
                 let expr: Expression = self.parse_expression()?;
@@ -212,6 +213,10 @@ impl Parser {
             TokenKind::String(value) => {
                 self.advance();
                 Ok(Expression::Literal(Literal::String(value.clone())))
+            }
+            TokenKind::Boolean(value) => {
+                self.advance();
+                Ok(Expression::Literal(Literal::Boolean(*value)))
             }
             _ => Err(format!("Expected literal, found {:?}", token.kind)),
         }
@@ -479,6 +484,26 @@ mod tests {
             statements: vec![Statement::Expression(Expression::Literal(Literal::String(
                 "\n↠E".to_string(),
             )))],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn boolean_literal() {
+        // true; false;
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Boolean(true), 0, 1),
+            Token::new(TokenKind::Semicolon, 0, 5),
+            Token::new(TokenKind::Boolean(false), 0, 7),
+            Token::new(TokenKind::Semicolon, 0, 12),
+            Token::new(TokenKind::EndOfFile, 0, 13),
+        ];
+        let result: Program = Parser::parse(tokens).unwrap();
+        let expected: Program = Program {
+            statements: vec![
+                Statement::Expression(Expression::Literal(Literal::Boolean(true))),
+                Statement::Expression(Expression::Literal(Literal::Boolean(false))),
+            ],
         };
         assert_eq!(result, expected);
     }

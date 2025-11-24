@@ -163,18 +163,19 @@ impl Lexer {
 
         if !identifier_vec.is_empty() {
             let identifier_str: String = identifier_vec.iter().collect();
-            match identifier_str.as_str() {
-                "let" => tokens.push(Token::new(
-                    TokenKind::Keyword(Keyword::Let),
-                    identifier_start_loc.0,
-                    identifier_start_loc.1,
-                )),
-                identifier => tokens.push(Token::new(
-                    TokenKind::Identifier(String::from(identifier)),
-                    identifier_start_loc.0,
-                    identifier_start_loc.1,
-                )),
-            }
+            let kind: TokenKind = match identifier_str.as_str() {
+                "let" => TokenKind::Keyword(Keyword::Let),
+                "true" => TokenKind::Boolean(true),
+                "false" => TokenKind::Boolean(false),
+                identifier => TokenKind::Identifier(String::from(identifier)),
+            };
+
+            tokens.push(Token::new(
+                kind,
+                identifier_start_loc.0,
+                identifier_start_loc.1,
+            ));
+
             return true;
         }
 
@@ -518,6 +519,17 @@ mod lexer_tests {
                 1,
             ),
             Token::new(TokenKind::EndOfFile, 1, 35),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn boolean_literals() {
+        let result: Vec<Token> = Lexer::tokenize("true false").unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Boolean(true), 1, 1),
+            Token::new(TokenKind::Boolean(false), 1, 6),
+            Token::new(TokenKind::EndOfFile, 1, 11),
         ];
         assert_eq!(result, expected);
     }
