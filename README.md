@@ -109,7 +109,8 @@ Booleans do **not** implement **any** of the currently 4 existing [operators](#o
 ## Identifiers
 Identifiers are currently only used to name variables. Identifiers **have** to start with a letter
 (uppercase or lowercase), followed by zero or more letters (uppercase or lowercase), numbers and
-underscores.
+underscores. Make sure **not** to put these in quotes, as that will result in a
+[string literal](#strings) instead.
 ```
 x;
 hello_123_world__;
