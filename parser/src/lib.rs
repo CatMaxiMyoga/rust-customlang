@@ -487,4 +487,24 @@ mod tests {
         };
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn boolean_literal() {
+        // true; false;
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::Boolean(true), 0, 1),
+            Token::new(TokenKind::Semicolon, 0, 5),
+            Token::new(TokenKind::Boolean(false), 0, 7),
+            Token::new(TokenKind::Semicolon, 0, 12),
+            Token::new(TokenKind::EndOfFile, 0, 13),
+        ];
+        let result: Program = Parser::parse(tokens).unwrap();
+        let expected: Program = Program {
+            statements: vec![
+                Statement::Expression(Expression::Literal(Literal::Boolean(true))),
+                Statement::Expression(Expression::Literal(Literal::Boolean(false))),
+            ],
+        };
+        assert_eq!(result, expected);
+    }
 }
