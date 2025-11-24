@@ -181,9 +181,10 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expression, String> {
         let token: Token = self.peek()?.clone();
         match token.kind {
-            TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::String(_) => {
-                self.parse_literal()
-            }
+            TokenKind::Integer(_)
+            | TokenKind::Float(_)
+            | TokenKind::String(_)
+            | TokenKind::Boolean(_) => self.parse_literal(),
             TokenKind::LeftParen => {
                 self.advance();
                 let expr: Expression = self.parse_expression()?;
