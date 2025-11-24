@@ -163,18 +163,19 @@ impl Lexer {
 
         if !identifier_vec.is_empty() {
             let identifier_str: String = identifier_vec.iter().collect();
-            match identifier_str.as_str() {
-                "let" => tokens.push(Token::new(
-                    TokenKind::Keyword(Keyword::Let),
-                    identifier_start_loc.0,
-                    identifier_start_loc.1,
-                )),
-                identifier => tokens.push(Token::new(
-                    TokenKind::Identifier(String::from(identifier)),
-                    identifier_start_loc.0,
-                    identifier_start_loc.1,
-                )),
-            }
+            let kind: TokenKind = match identifier_str.as_str() {
+                "let" => TokenKind::Keyword(Keyword::Let),
+                "true" => TokenKind::Boolean(true),
+                "false" => TokenKind::Boolean(false),
+                identifier => TokenKind::Identifier(String::from(identifier)),
+            };
+
+            tokens.push(Token::new(
+                kind,
+                identifier_start_loc.0,
+                identifier_start_loc.1,
+            ));
+
             return true;
         }
 
