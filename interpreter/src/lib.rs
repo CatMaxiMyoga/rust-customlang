@@ -95,6 +95,7 @@ impl<'a> Interpreter<'a> {
             Literal::Integer(value) => RuntimeValue::Integer(*value),
             Literal::Float(value) => RuntimeValue::Float(*value),
             Literal::String(value) => RuntimeValue::String(value.clone()),
+            Literal::Boolean(value) => RuntimeValue::Boolean(*value),
         }
     }
 
