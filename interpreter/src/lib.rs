@@ -296,4 +296,16 @@ mod tests {
         let result: RuntimeValue = interpreter.expression(expression).unwrap();
         assert_eq!(result, RuntimeValue::String(String::from("helloworld")));
     }
+
+    #[test]
+    fn boolean_literal() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let expression: Expression = Expression::Literal(Literal::Boolean(true));
+        let result: RuntimeValue = interpreter.expression(expression).unwrap();
+        assert_eq!(result, RuntimeValue::Boolean(true));
+        let expression: Expression = Expression::Literal(Literal::Boolean(false));
+        let result: RuntimeValue = interpreter.expression(expression).unwrap();
+        assert_eq!(result, RuntimeValue::Boolean(false));
+    }
 }
