@@ -12,25 +12,17 @@ pub struct Parser {
 }
 
 impl Parser {
-    /// Creates a new parser instance with the provided tokens.
-    ///
-    /// # Arguments
-    ///
-    /// * `tokens` - The tokens to be parsed.
-    #[must_use]
-    pub const fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, index: 0 }
-    }
-
     /// Parses the tokens and returns the root of the AST.
     ///
     /// # Errors
     /// Unexpected end of input or invalid syntax.
-    pub fn parse(&mut self) -> Result<Program, String> {
+    pub fn parse(tokens: Vec<Token>) -> Result<Program, String> {
+        let mut parser: Self = Self { tokens, index: 0 };
+        
         let mut statements: Vec<Statement> = Vec::new();
 
-        while !self.is_eof()? {
-            statements.push(self.parse_statement()?);
+        while !parser.is_eof()? {
+            statements.push(parser.parse_statement()?);
         }
 
         Ok(Program { statements })
@@ -235,8 +227,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 8),
             Token::new(TokenKind::EndOfFile, 0, 9),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Integer(2))),
@@ -257,8 +248,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 8),
             Token::new(TokenKind::EndOfFile, 0, 9),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Float(5.0))),
@@ -279,8 +269,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 6),
             Token::new(TokenKind::EndOfFile, 0, 7),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Integer(4))),
@@ -301,8 +290,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 8),
             Token::new(TokenKind::EndOfFile, 0, 9),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Integer(8))),
@@ -321,8 +309,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 3),
             Token::new(TokenKind::EndOfFile, 0, 4),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Literal(
                 Literal::Integer(42),
@@ -339,8 +326,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 5),
             Token::new(TokenKind::EndOfFile, 0, 6),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Literal(Literal::Float(
                 3.24,
@@ -361,8 +347,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 8),
             Token::new(TokenKind::EndOfFile, 0, 9),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Integer(1))),
@@ -385,8 +370,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 12),
             Token::new(TokenKind::EndOfFile, 0, 13),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Literal(Literal::Integer(2))),
@@ -415,8 +399,7 @@ mod tests {
             Token::new(TokenKind::Semicolon, 0, 14),
             Token::new(TokenKind::EndOfFile, 0, 15),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let program: Program = parser.parse().unwrap();
+        let program: Program = Parser::parse(tokens).unwrap();
         let expected: Program = Program {
             statements: vec![Statement::Expression(Expression::Binary {
                 left: Box::new(Expression::Binary {
@@ -440,8 +423,7 @@ mod tests {
             Token::new(TokenKind::Integer(3), 0, 5),
             Token::new(TokenKind::EndOfFile, 0, 6),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let result: String = parser.parse().err().unwrap();
+        let result: String = Parser::parse(tokens).err().unwrap();
         let expected_err: String = "Expected token 'Semicolon', found 'Integer(2)'".to_string();
         assert_eq!(result, expected_err);
     }
@@ -456,8 +438,7 @@ mod tests {
             Token::new(TokenKind::Integer(2), 0, 6),
             Token::new(TokenKind::EndOfFile, 0, 7),
         ];
-        let mut parser: Parser = Parser::new(tokens);
-        let result: String = parser.parse().err().unwrap();
+        let result: String = Parser::parse(tokens).err().unwrap();
         let expected_err: String = "Expected token 'RightParen', found 'EndOfFile'".to_string();
         assert_eq!(result, expected_err);
     }
