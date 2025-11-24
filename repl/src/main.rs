@@ -17,8 +17,7 @@ fn main() {
         }
 
         input = input[..input.len().saturating_sub(1)].to_string(); // Remove newline
-        let mut l: Lexer = Lexer::new(&input);
-        let tokens: Result<Vec<Token>, String> = l.tokenize();
+        let tokens: Result<Vec<Token>, String> = Lexer::tokenize(&input);
 
         match tokens {
             Ok(toks) => {
