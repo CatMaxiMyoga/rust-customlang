@@ -122,7 +122,7 @@ Currently, all variables are mutable. Variables can hold any of the currently 4 
 (string, integer, float, boolean). Variables are declared by using the `let` keyword, followed by
 at least one whitespace character, following an `identifier` (the name of the variable), followed
 by either a semicolon `;`, declaring the end of the statement, or an equals sign `=`, declaring an
-immediate initialization.
+immediate initialization, followed by an expression (the value).
 ```
 let x;
 let y = 5;
