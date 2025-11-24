@@ -497,4 +497,28 @@ mod lexer_tests {
         ];
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn string_literal() {
+        let result: Vec<Token> = Lexer::tokenize(r#""Hello, World!""#).unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::String(String::from("Hello, World!")), 1, 1),
+            Token::new(TokenKind::EndOfFile, 1, 16),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn string_escape_sequences() {
+        let result: Vec<Token> = Lexer::tokenize(r#""\n\t\r\b\0\f\v\a\u{21A0}\x45\\\"""#).unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(
+                TokenKind::String(String::from("\n\t\r\x08\0\x0C\x0B\x07↠E\\\"")),
+                1,
+                1,
+            ),
+            Token::new(TokenKind::EndOfFile, 1, 35),
+        ];
+        assert_eq!(result, expected);
+    }
 }
