@@ -135,8 +135,8 @@ have the type of the value assigned to it. In the above example, y hold the type
 
 ### Delayed Variable Initialization
 Variables can be initialized **at** declaration or afterwards. Initializing an already declared
-variable is the exact same as [variable assignment](#variable-reassignment), except that you don't
-have to worry about using the right type, since the variable doesn't have a type yet.
+variable is the exact same as [variable reassignment](#variable-reassignment), except that you
+don't have to worry about using the right type, since the variable doesn't have a type yet.
 ```
 let x;
 x = 5;
