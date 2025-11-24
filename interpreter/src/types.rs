@@ -12,6 +12,8 @@ pub enum Value {
     Integer(i64),
     /// A floating-point value.
     Float(f64),
+    /// A string value.
+    String(String),
 }
 
 impl Value {
@@ -27,6 +29,10 @@ impl Value {
             #[allow(clippy::cast_precision_loss)]
             (Self::Float(lhs), Self::Integer(rhs)) => Self::Float(float_op(*lhs, *rhs as f64)),
             (Self::Float(lhs), Self::Float(rhs)) => Self::Float(float_op(*lhs, *rhs)),
+            (Self::String(_), _) | (_, Self::String(_))=> {
+                eprintln!("Cannot perform arithmetic operations on strings");
+                std::process::exit(1)
+            }
         }
     }
 }

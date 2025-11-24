@@ -18,7 +18,7 @@ impl Parser {
     /// Unexpected end of input or invalid syntax.
     pub fn parse(tokens: Vec<Token>) -> Result<Program, String> {
         let mut parser: Self = Self { tokens, index: 0 };
-        
+
         let mut statements: Vec<Statement> = Vec::new();
 
         while !parser.is_eof()? {
@@ -181,7 +181,9 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expression, String> {
         let token: Token = self.peek()?.clone();
         match token.kind {
-            TokenKind::Integer(_) | TokenKind::Float(_) => self.parse_literal(),
+            TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::String(_) => {
+                self.parse_literal()
+            }
             TokenKind::LeftParen => {
                 self.advance();
                 let expr: Expression = self.parse_expression()?;
@@ -206,6 +208,10 @@ impl Parser {
             TokenKind::Float(value) => {
                 self.advance();
                 Ok(Expression::Literal(Literal::Float(*value)))
+            }
+            TokenKind::String(value) => {
+                self.advance();
+                Ok(Expression::Literal(Literal::String(value.clone())))
             }
             _ => Err(format!("Expected literal, found {:?}", token.kind)),
         }
@@ -441,5 +447,39 @@ mod tests {
         let result: String = Parser::parse(tokens).err().unwrap();
         let expected_err: String = "Expected token 'RightParen', found 'EndOfFile'".to_string();
         assert_eq!(result, expected_err);
+    }
+
+    #[test]
+    fn string_literal() {
+        // "Hello";
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::String("Hello".to_string()), 0, 1),
+            Token::new(TokenKind::Semicolon, 0, 8),
+            Token::new(TokenKind::EndOfFile, 0, 9),
+        ];
+        let result: Program = Parser::parse(tokens).unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Literal(Literal::String(
+                "Hello".to_string(),
+            )))],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn string_escape_sequences() {
+        // "\n\u{21A0}\x45"
+        let tokens: Vec<Token> = vec![
+            Token::new(TokenKind::String("\n↠E".to_string()), 0, 1),
+            Token::new(TokenKind::Semicolon, 0, 15),
+            Token::new(TokenKind::EndOfFile, 0, 16),
+        ];
+        let result: Program = Parser::parse(tokens).unwrap();
+        let expected: Program = Program {
+            statements: vec![Statement::Expression(Expression::Literal(Literal::String(
+                "\n↠E".to_string(),
+            )))],
+        };
+        assert_eq!(result, expected);
     }
 }

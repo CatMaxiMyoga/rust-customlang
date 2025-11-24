@@ -91,10 +91,11 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    const fn literal_expression(literal: &Literal) -> Value {
+    fn literal_expression(literal: &Literal) -> Value {
         match literal {
             Literal::Integer(value) => Value::Integer(*value),
             Literal::Float(value) => Value::Float(*value),
+            Literal::String(value) => Value::String(value.clone()),
         }
     }
 

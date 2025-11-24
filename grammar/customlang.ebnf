@@ -7,14 +7,22 @@ Lowercase = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l
   | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
 Uppercase = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O"
   | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z";
+HexCharacter = Digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
+Character = ? any printable character ? ;
+EscapeSequence = "\", (
+  ("u", "{", HexCharacter, {HexCharacter}, "}")
+  | ("x", 2 * HexCharacter)
+  | Character - ("u" | "x")
+) ;
 Letter = Lowercase | Uppercase ;
 
 Integer = Digit, { Digit } ;
 Float = [ Integer ], ".", Integer ;
+String = '"', { Character - ("\" | '"') | EscapeSequence }, '"' ;
 
 Identifier = Letter, { Letter | Digit | "_" } ;
 
-Literal = Integer | Float ;
+Literal = Integer | Float | String ;
 
 Expression = Term, { _, ("+" | "-"), _, Term } ;
 Term = Factor, { _, ("*" | "/"), _, Factor } ;

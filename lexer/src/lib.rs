@@ -12,14 +12,14 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    /// Tokenizes the source code and returns a vector of tokens. 
+    /// Tokenizes the source code and returns a vector of tokens.
     ///
     /// # Errors
     /// If invalid characters or number formats are encountered.
     ///
     /// # Panics
     /// Only panics if internal assumptions are violated.
-    pub fn tokenize(source :&str) -> Result<Vec<Token>, String> {
+    pub fn tokenize(source: &str) -> Result<Vec<Token>, String> {
         let mut lexer: Self = Self {
             source: source.chars().collect(),
             index: 0,
@@ -78,7 +78,7 @@ impl Lexer {
     }
 
     fn multiple_char_token(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
-        Ok(self.number(tokens)? || self.identifier(tokens))
+        Ok(self.number(tokens)? || self.identifier(tokens) || self.string(tokens)?)
     }
 
     fn number(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
@@ -154,7 +154,7 @@ impl Lexer {
         let mut identifier_vec: Vec<char> = vec![];
         let identifier_start_loc: (usize, usize) = (self.line, self.column);
         while self.index < self.source.len()
-        && (self.source[self.index].is_alphanumeric() || self.source[self.index] == '_')
+            && (self.source[self.index].is_alphanumeric() || self.source[self.index] == '_')
         {
             identifier_vec.push(self.source[self.index]);
             self.column += 1;
@@ -175,10 +175,148 @@ impl Lexer {
                     identifier_start_loc.1,
                 )),
             }
-            return true
+            return true;
         }
 
         false
+    }
+
+    fn string(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
+        if self.source[self.index] != '"' {
+            return Ok(false);
+        }
+
+        let string_start_loc: (usize, usize) = (self.line, self.column);
+        self.index += 1;
+        self.column += 1;
+
+        let mut string_vec: Vec<char> = vec![];
+        while self.index < self.source.len() && self.source[self.index] != '"' {
+            if self.source[self.index] != '\\' {
+                string_vec.push(self.source[self.index]);
+                self.index += 1;
+                self.column += 1;
+                continue;
+            }
+
+            self.index += 1;
+            self.column += 1;
+
+            let ch: char = self.source[self.index];
+            match ch {
+                'n' => string_vec.push('\n'),
+                't' => string_vec.push('\t'),
+                'r' => string_vec.push('\r'),
+                'b' => string_vec.push('\x08'),
+                '0' => string_vec.push('\0'),
+                'f' => string_vec.push('\x0C'),
+                'v' => string_vec.push('\x0B'),
+                'a' => string_vec.push('\x07'),
+                'u' => self.string_unicode(&mut string_vec)?,
+                'x' => self.string_ascii(&mut string_vec)?,
+                other => string_vec.push(other),
+            }
+
+            self.index += 1;
+            self.column += 1;
+        }
+
+        dbg!(self.index, self.source.len(), &string_vec);
+        if self.index >= self.source.len() {
+            return Err(format!(
+                "Unterminated string starting at {}:{}",
+                string_start_loc.0, string_start_loc.1
+            ));
+        }
+
+        self.index += 1;
+        self.column += 1;
+
+        tokens.push(Token::new(
+            TokenKind::String(string_vec.iter().collect()),
+            string_start_loc.0,
+            string_start_loc.1,
+        ));
+
+        Ok(true)
+    }
+
+    fn string_unicode(&mut self, string_vec: &mut Vec<char>) -> Result<(), String> {
+        let start_loc: (usize, usize) = (self.line - 1, self.column - 1);
+
+        self.index += 1;
+        self.column += 1;
+
+        if self.index >= self.source.len() || self.source[self.index] != '{' {
+            return Err(format!(
+                "Invalid Unicode Escape at {}:{}",
+                start_loc.0, start_loc.1
+            ));
+        }
+
+        self.index += 1;
+        self.column += 1;
+
+        let mut unicode_seq: String = String::new();
+        while self.index < self.source.len() && self.source[self.index].is_ascii_hexdigit() {
+            unicode_seq.push(self.source[self.index]);
+            self.index += 1;
+            self.column += 1;
+        }
+
+        if self.index >= self.source.len() || self.source[self.index] != '}' {
+            return Err(format!(
+                "Invalid Unicode Escape at {}:{}",
+                start_loc.0, start_loc.1
+            ));
+        }
+
+        let unicode_code: u32 = u32::from_str_radix(&unicode_seq, 16)
+            .map_err(|_| format!("Invalid Unicode Escape at {}:{}", start_loc.0, start_loc.1))?;
+
+        std::char::from_u32(unicode_code).map_or_else(
+            || {
+                Err(format!(
+                    "Invalid Unicode Code Point at {}:{}",
+                    start_loc.0, start_loc.1
+                ))
+            },
+            |unicode_char| {
+                string_vec.push(unicode_char);
+                Ok(())
+            },
+        )
+    }
+
+    fn string_ascii(&mut self, string_vec: &mut Vec<char>) -> Result<(), String> {
+        let start_loc: (usize, usize) = (self.line - 1, self.column - 1);
+
+        self.index += 1;
+        self.column += 1;
+
+        if self.index + 1 >= self.source.len() {
+            return Err(format!(
+                "Invalid Unicode Escape at {}:{}",
+                start_loc.0, start_loc.1
+            ));
+        }
+
+        let hex_seq: String = self.source[self.index..self.index + 2].iter().collect();
+
+        let byte: u8 = u8::from_str_radix(&hex_seq, 16)
+            .map_err(|_| format!("Invalid Unicode Escape at {}:{}", start_loc.0, start_loc.1))?;
+
+        if byte <= 0x7F {
+            string_vec.push(byte as char);
+            self.index += 1;
+            self.column += 1;
+            Ok(())
+        } else {
+            Err(format!(
+                "Invalid ASCII Code Point at {}:{}",
+                start_loc.0, start_loc.1
+            ))
+        }
     }
 }
 
@@ -356,6 +494,30 @@ mod lexer_tests {
             Token::new(TokenKind::Integer(10), 1, 9),
             Token::new(TokenKind::Semicolon, 1, 11),
             Token::new(TokenKind::EndOfFile, 1, 12),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn string_literal() {
+        let result: Vec<Token> = Lexer::tokenize(r#""Hello, World!""#).unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::String(String::from("Hello, World!")), 1, 1),
+            Token::new(TokenKind::EndOfFile, 1, 16),
+        ];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn string_escape_sequences() {
+        let result: Vec<Token> = Lexer::tokenize(r#""\n\t\r\b\0\f\v\a\u{21A0}\x45\\\"""#).unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(
+                TokenKind::String(String::from("\n\t\r\x08\0\x0C\x0B\x07↠E\\\"")),
+                1,
+                1,
+            ),
+            Token::new(TokenKind::EndOfFile, 1, 35),
         ];
         assert_eq!(result, expected);
     }
