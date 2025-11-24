@@ -37,7 +37,7 @@ fn main() {
 
                         println!("\nInterpreter Output:");
                         Interpreter::run(program, &mut environment).unwrap_or_else(|e| {
-                            println!("Interpreter error: {e}");
+                            println!("Interpreter error: {e:?}");
                         });
                     }
                     Err(e) => {

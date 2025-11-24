@@ -2,10 +2,9 @@
 
 pub mod types;
 
-use std::mem::discriminant;
-
 use parser::types::{Expression, Literal, Operator, Program, Statement};
-use types::Value;
+use std::mem::discriminant;
+use types::{RuntimeError, RuntimeResult, RuntimeValue};
 
 use crate::types::Environment;
 
@@ -19,7 +18,7 @@ impl<'a> Interpreter<'a> {
     ///
     /// # Errors
     /// Errors if runtime errors.
-    pub fn run(program: Program, environment: &'a mut Environment) -> Result<(), String> {
+    pub fn run(program: Program, environment: &'a mut Environment) -> Result<(), RuntimeError> {
         let mut interpreter: Self = Self { environment };
         for statement in program.statements {
             interpreter.statement(statement)?;
@@ -33,15 +32,15 @@ impl<'a> Interpreter<'a> {
         Self { environment }
     }
 
-    fn statement(&mut self, statement: Statement) -> Result<(), String> {
+    fn statement(&mut self, statement: Statement) -> Result<(), RuntimeError> {
         match statement {
             Statement::Expression(expr) => {
                 // TEMP: prints the result of expression statements
-                let expression_result: Value = self.expression(expr)?;
+                let expression_result: RuntimeValue = self.expression(expr)?;
                 println!("{expression_result:?}");
             }
             Statement::VariableDeclaration { name, value } => {
-                let value: Option<Value> = if let Some(expr) = value {
+                let value: Option<RuntimeValue> = if let Some(expr) = value {
                     Some(self.expression(expr)?)
                 } else {
                     None
@@ -49,18 +48,18 @@ impl<'a> Interpreter<'a> {
                 self.environment.insert(name, value);
             }
             Statement::VariableAssignment { name, value } => {
-                let old: Option<Value> = if let Some(val) = self.environment.get(&name) {
+                let old: Option<RuntimeValue> = if let Some(val) = self.environment.get(&name) {
                     val.clone()
                 } else {
-                    return Err(format!("Variable '{name}' not declared"));
+                    return Err(RuntimeError::VaiableNotFound(name));
                 };
 
-                let value: Value = self.expression(value)?;
+                let value: RuntimeValue = self.expression(value)?;
 
                 if let Some(old) = old
                     && discriminant(&old) != discriminant(&value)
                 {
-                    return Err(format!("Type mismatch in assignment to variable '{name}'"));
+                    return Err(RuntimeError::TypeMismatch);
                 }
 
                 self.environment.insert(name, Some(value));
@@ -70,7 +69,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn expression(&mut self, expression: Expression) -> Result<Value, String> {
+    fn expression(&mut self, expression: Expression) -> RuntimeResult {
         match expression {
             Expression::Literal(literal) => Ok(Self::literal_expression(&literal)),
             Expression::Binary {
@@ -81,21 +80,21 @@ impl<'a> Interpreter<'a> {
             Expression::Identifier(identifier) => {
                 if self.environment.contains_key(&identifier) {
                     self.environment[&identifier].as_ref().map_or_else(
-                        || Err(String::from("Variable '{identifier}' is uninitialized")),
+                        || Err(RuntimeError::VariableUninitialized(identifier)),
                         |value| Ok(value.clone()),
                     )
                 } else {
-                    Err(format!("Variable '{identifier}' not declared"))
+                    Err(RuntimeError::VaiableNotFound(identifier))
                 }
             }
         }
     }
 
-    fn literal_expression(literal: &Literal) -> Value {
+    fn literal_expression(literal: &Literal) -> RuntimeValue {
         match literal {
-            Literal::Integer(value) => Value::Integer(*value),
-            Literal::Float(value) => Value::Float(*value),
-            Literal::String(value) => Value::String(value.clone()),
+            Literal::Integer(value) => RuntimeValue::Integer(*value),
+            Literal::Float(value) => RuntimeValue::Float(*value),
+            Literal::String(value) => RuntimeValue::String(value.clone()),
         }
     }
 
@@ -104,9 +103,9 @@ impl<'a> Interpreter<'a> {
         left: Expression,
         operator: &Operator,
         right: Expression,
-    ) -> Result<Value, String> {
-        let left: Value = self.expression(left)?;
-        let right: Value = self.expression(right)?;
+    ) -> RuntimeResult {
+        let left: RuntimeValue = self.expression(left)?;
+        let right: RuntimeValue = self.expression(right)?;
 
         match operator {
             Operator::Add => left + right,
@@ -134,7 +133,7 @@ mod tests {
                         operator: Operator::$op,
                         right: Box::new($right)
                     };
-                    let result: Value = interpreter.expression(expression).unwrap();
+                    let result: RuntimeValue = interpreter.expression(expression).unwrap();
                     assert_eq!(result, $result);
                 }
             }
@@ -151,40 +150,40 @@ mod tests {
         integer,
         Expression::Literal(Literal::Integer(5)),
         Expression::Literal(Literal::Integer(2)),
-        Value::Integer(7),
-        Value::Integer(3),
-        Value::Integer(10),
-        Value::Integer(2)
+        RuntimeValue::Integer(7),
+        RuntimeValue::Integer(3),
+        RuntimeValue::Integer(10),
+        RuntimeValue::Integer(2)
     );
 
     test_all_ops!(
         float,
         Expression::Literal(Literal::Float(5.0)),
         Expression::Literal(Literal::Float(2.0)),
-        Value::Float(7.0),
-        Value::Float(3.0),
-        Value::Float(10.0),
-        Value::Float(2.5)
+        RuntimeValue::Float(7.0),
+        RuntimeValue::Float(3.0),
+        RuntimeValue::Float(10.0),
+        RuntimeValue::Float(2.5)
     );
 
     test_all_ops!(
         mixed,
         Expression::Literal(Literal::Integer(5)),
         Expression::Literal(Literal::Float(2.0)),
-        Value::Float(7.0),
-        Value::Float(3.0),
-        Value::Float(10.0),
-        Value::Float(2.5)
+        RuntimeValue::Float(7.0),
+        RuntimeValue::Float(3.0),
+        RuntimeValue::Float(10.0),
+        RuntimeValue::Float(2.5)
     );
 
     test_all_ops!(
         mixed_reverse,
         Expression::Literal(Literal::Float(5.0)),
         Expression::Literal(Literal::Integer(2)),
-        Value::Float(7.0),
-        Value::Float(3.0),
-        Value::Float(10.0),
-        Value::Float(2.5)
+        RuntimeValue::Float(7.0),
+        RuntimeValue::Float(3.0),
+        RuntimeValue::Float(10.0),
+        RuntimeValue::Float(2.5)
     );
 
     #[test]
@@ -212,7 +211,7 @@ mod tests {
         interpreter.statement(declaration).unwrap();
 
         assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(Value::Integer(10)));
+        assert_eq!(environment["x"], Some(RuntimeValue::Integer(10)));
     }
 
     #[test]
@@ -228,13 +227,13 @@ mod tests {
         interpreter.statement(assignment).unwrap();
 
         assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(Value::Float(20.0)));
+        assert_eq!(environment["x"], Some(RuntimeValue::Float(20.0)));
     }
 
     #[test]
     fn variable_reassignment() {
         let mut environment: Environment = Environment::new();
-        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        environment.insert(String::from("x"), Some(RuntimeValue::Integer(10)));
         let mut interpreter: Interpreter = Interpreter::new(&mut environment);
 
         let assignment: Statement = Statement::VariableAssignment {
@@ -244,26 +243,23 @@ mod tests {
         interpreter.statement(assignment).unwrap();
 
         assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(Value::Integer(30)));
+        assert_eq!(environment["x"], Some(RuntimeValue::Integer(30)));
     }
 
     #[test]
     fn variable_type_mismatch() {
         let mut environment: Environment = Environment::new();
-        environment.insert(String::from("x"), Some(Value::Integer(10)));
+        environment.insert(String::from("x"), Some(RuntimeValue::Integer(10)));
         let mut interpreter: Interpreter = Interpreter::new(&mut environment);
 
         let assignment: Statement = Statement::VariableAssignment {
             name: String::from("x"),
             value: Expression::Literal(Literal::Float(20.0)),
         };
-        let result: Result<(), String> = interpreter.statement(assignment);
+        let result: Result<(), RuntimeError> = interpreter.statement(assignment);
 
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Type mismatch in assignment to variable 'x'"
-        );
+        assert_eq!(result.unwrap_err(), RuntimeError::TypeMismatch);
     }
 
     #[test]
@@ -276,12 +272,27 @@ mod tests {
             operator: Operator::Multiply,
             right: Box::new(Expression::Literal(Literal::Integer(5))),
         };
-        let result: Result<Value, String> = interpreter.expression(expression);
+        let result: RuntimeResult = interpreter.expression(expression);
 
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "Cannot perform arithmetic operations on strings"
+            RuntimeError::IllegalOperation(String::from(
+                "Multiplication not supported for String type"
+            ))
         );
+    }
+
+    #[test]
+    fn string_concatenation() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let expression: Expression = Expression::Binary {
+            left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
+            operator: Operator::Add,
+            right: Box::new(Expression::Literal(Literal::String(String::from("world")))),
+        };
+        let result: RuntimeValue = interpreter.expression(expression).unwrap();
+        assert_eq!(result, RuntimeValue::String(String::from("helloworld")));
     }
 }
