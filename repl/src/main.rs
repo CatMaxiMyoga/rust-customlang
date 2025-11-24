@@ -26,8 +26,7 @@ fn main() {
                     println!("{tok:?}");
                 }
 
-                let mut p: Parser = Parser::new(toks);
-                let ast: Result<Program, String> = p.parse();
+                let ast: Result<Program, String> = Parser::parse(toks);
 
                 match ast {
                     Ok(program) => {
