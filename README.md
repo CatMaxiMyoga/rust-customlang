@@ -237,3 +237,7 @@ an error for this operator, it will result in an error.
 
 Any division by zero, whether float or integer results in a `DivisionByZero` error, unless the
 left type doesn't implement division with numbers.
+```
+10 / 0;
+>> Error: DivisionByZero
+```
