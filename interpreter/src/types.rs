@@ -3,18 +3,72 @@
 use std::ops::{Add, Div, Mul, Sub};
 
 /// Represents the environment mapping variable names to their values.
-pub type Environment = std::collections::HashMap<String, Option<Value>>;
+pub type Environment = std::collections::HashMap<String, Option<RuntimeValue>>;
+
+type Identifier = String;
+
+/// Represents runtime errors that can occur during interpretation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeError {
+    /// Division by zero error.
+    ///
+    /// # Example
+    /// ```ignore
+    /// 5 / 0;
+    /// ```
+    DivisionByZero,
+
+    /// Type mismatch error.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let x = 5;
+    /// x = 5.2;
+    /// ```
+    TypeMismatch,
+
+    /// Illegal operation error. Holds a message describing the illegal operation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// 5 + "Hello";
+    /// >> "Cannot add Integer with non-numeric type"
+    /// ```
+    IllegalOperation(String),
+
+    /// Variable not found error. Holds the name of the missing variable.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let x = y + 5;
+    /// >> "y"
+    /// ```
+    VaiableNotFound(Identifier),
+
+    /// Variable uninitialized error. Holds the name of the uninitialized variable.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let x;
+    /// x + 5;
+    /// >> "x"
+    /// ```
+    VariableUninitialized(Identifier),
+}
+
+/// Represents the result of a runtime operation returning a value
+pub type RuntimeResult = Result<RuntimeValue, RuntimeError>;
 
 trait Operations {
-    fn add(&self, lsh: &Value, rhs: &Value) -> Result<Value, String>;
-    fn sub(&self, lsh: &Value, rhs: &Value) -> Result<Value, String>;
-    fn mul(&self, lsh: &Value, rhs: &Value) -> Result<Value, String>;
-    fn div(&self, lsh: &Value, rhs: &Value) -> Result<Value, String>;
+    fn add(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult;
+    fn sub(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult;
+    fn mul(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult;
+    fn div(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult;
 }
 
 /// Represents all types of values Expressions can return when evaluated.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum RuntimeValue {
     /// An integer value.
     Integer(i64),
     /// A floating-point value.
@@ -23,7 +77,7 @@ pub enum Value {
     String(String),
 }
 
-impl Value {
+impl RuntimeValue {
     fn ops(&self) -> &dyn Operations {
         match self {
             Self::Integer(_) => &IntegerOperations,
@@ -33,29 +87,29 @@ impl Value {
     }
 }
 
-impl Add for Value {
-    type Output = Result<Self, String>;
+impl Add for RuntimeValue {
+    type Output = RuntimeResult;
     fn add(self, rhs: Self) -> Self::Output {
         self.ops().add(&self, &rhs)
     }
 }
 
-impl Sub for Value {
-    type Output = Result<Self, String>;
+impl Sub for RuntimeValue {
+    type Output = RuntimeResult;
     fn sub(self, rhs: Self) -> Self::Output {
         self.ops().sub(&self, &rhs)
     }
 }
 
-impl Mul for Value {
-    type Output = Result<Self, String>;
+impl Mul for RuntimeValue {
+    type Output = RuntimeResult;
     fn mul(self, rhs: Self) -> Self::Output {
         self.ops().mul(&self, &rhs)
     }
 }
 
-impl Div for Value {
-    type Output = Result<Self, String>;
+impl Div for RuntimeValue {
+    type Output = RuntimeResult;
     fn div(self, rhs: Self) -> Self::Output {
         self.ops().div(&self, &rhs)
     }
@@ -63,151 +117,175 @@ impl Div for Value {
 
 struct IntegerOperations;
 impl Operations for IntegerOperations {
-    fn add(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Integer(lhs) = lhs else {
+    fn add(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::Integer(rhs) => Ok(Value::Integer(lhs + rhs)),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs + rhs)),
             #[allow(clippy::cast_precision_loss)]
-            Value::Float(rhs) => Ok(Value::Float(*lhs as f64 + rhs)),
-            Value::String(_) => Err("Cannot add Integer with non-numeric type".to_string()),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 + rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot add Integer with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn sub(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Integer(lhs) = lhs else {
+    fn sub(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::Integer(rhs) => Ok(Value::Integer(lhs - rhs)),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs - rhs)),
             #[allow(clippy::cast_precision_loss)]
-            Value::Float(rhs) => Ok(Value::Float(*lhs as f64 - rhs)),
-            Value::String(_) => Err("Cannot subtract Integer with non-numeric type".to_string()),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 - rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot subtract Integer with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn mul(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Integer(lhs) = lhs else {
+    fn mul(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::Integer(rhs) => Ok(Value::Integer(lhs * rhs)),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Integer(lhs * rhs)),
             #[allow(clippy::cast_precision_loss)]
-            Value::Float(rhs) => Ok(Value::Float(*lhs as f64 * rhs)),
-            Value::String(_) => Err("Cannot multiply Integer with non-numeric type".to_string()),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(*lhs as f64 * rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot multiply Integer with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn div(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Integer(lhs) = lhs else {
+    fn div(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::Integer(rhs) => {
+            RuntimeValue::Integer(rhs) => {
                 if *rhs == 0 {
-                    Err("Division by zero".to_string())
+                    Err(RuntimeError::DivisionByZero)
                 } else {
-                    Ok(Value::Integer(lhs / rhs))
+                    Ok(RuntimeValue::Integer(lhs / rhs))
                 }
             }
-            Value::Float(rhs) => {
+            RuntimeValue::Float(rhs) => {
                 if *rhs == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(RuntimeError::DivisionByZero)
                 } else {
                     #[allow(clippy::cast_precision_loss)]
-                    Ok(Value::Float(*lhs as f64 / rhs))
+                    Ok(RuntimeValue::Float(*lhs as f64 / rhs))
                 }
             }
-            Value::String(_) => Err("Cannot divide Integer with non-numeric type".to_string()),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot divide Integer with non-numeric type".to_string(),
+            )),
         }
     }
 }
 
 struct FloatOperations;
 impl Operations for FloatOperations {
-    fn add(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Float(lhs) = lhs else {
+    fn add(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Float(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
             #[allow(clippy::cast_precision_loss)]
-            Value::Integer(rhs) => Ok(Value::Float(lhs + *rhs as f64)),
-            Value::Float(rhs) => Ok(Value::Float(lhs + rhs)),
-            Value::String(_) => Err("Cannot add Float with non-numeric type".to_string()),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs + *rhs as f64)),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs + rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot add Float with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn sub(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Float(lhs) = lhs else {
+    fn sub(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Float(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
             #[allow(clippy::cast_precision_loss)]
-            Value::Integer(rhs) => Ok(Value::Float(lhs - *rhs as f64)),
-            Value::Float(rhs) => Ok(Value::Float(lhs - rhs)),
-            Value::String(_) => Err("Cannot subtract Float with non-numeric type".to_string()),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs - *rhs as f64)),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs - rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot subtract Float with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn mul(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Float(lhs) = lhs else {
+    fn mul(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Float(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
             #[allow(clippy::cast_precision_loss)]
-            Value::Integer(rhs) => Ok(Value::Float(lhs * *rhs as f64)),
-            Value::Float(rhs) => Ok(Value::Float(lhs * rhs)),
-            Value::String(_) => Err("Cannot multiply Float with non-numeric type".to_string()),
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Float(lhs * *rhs as f64)),
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Float(lhs * rhs)),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot multiply Float with non-numeric type".to_string(),
+            )),
         }
     }
 
-    fn div(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::Float(lhs) = lhs else {
+    fn div(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::Float(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::Integer(rhs) => {
+            RuntimeValue::Integer(rhs) => {
                 if *rhs == 0 {
-                    Err("Division by zero".to_string())
+                    Err(RuntimeError::DivisionByZero)
                 } else {
                     #[allow(clippy::cast_precision_loss)]
-                    Ok(Value::Float(lhs / *rhs as f64))
+                    Ok(RuntimeValue::Float(lhs / *rhs as f64))
                 }
             }
-            Value::Float(rhs) => {
+            RuntimeValue::Float(rhs) => {
                 if *rhs == 0.0 {
-                    Err("Division by zero".to_string())
+                    Err(RuntimeError::DivisionByZero)
                 } else {
-                    Ok(Value::Float(lhs / rhs))
+                    Ok(RuntimeValue::Float(lhs / rhs))
                 }
             }
-            Value::String(_) => Err("Cannot divide Float with non-numeric type".to_string()),
+            RuntimeValue::String(_) => Err(RuntimeError::IllegalOperation(
+                "Cannot divide Float with non-numeric type".to_string(),
+            )),
         }
     }
 }
 
 struct StringOperations;
 impl Operations for StringOperations {
-    fn add(&self, lhs: &Value, rhs: &Value) -> Result<Value, String> {
-        let Value::String(lhs) = lhs else {
+    fn add(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> RuntimeResult {
+        let RuntimeValue::String(lhs) = lhs else {
             unreachable!()
         };
         match rhs {
-            Value::String(rhs) => Ok(Value::String(lhs.clone() + rhs)),
-            _ => Err("Cannot add String with non-String type".to_string()),
+            RuntimeValue::String(rhs) => Ok(RuntimeValue::String(lhs.clone() + rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot add String with non-String type".to_string(),
+            )),
         }
     }
 
-    fn sub(&self, _lhs: &Value, _rhs: &Value) -> Result<Value, String> {
-        Err("Subtraction not supported for String type".to_string())
+    fn sub(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Subtraction not supported for String type".to_string(),
+        ))
     }
 
-    fn mul(&self, _lhs: &Value, _rhs: &Value) -> Result<Value, String> {
-        Err("Multiplication not supported for String type".to_string())
+    fn mul(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Multiplication not supported for String type".to_string(),
+        ))
     }
 
-    fn div(&self, _lhs: &Value, _rhs: &Value) -> Result<Value, String> {
-        Err("Division not supported for String type".to_string())
+    fn div(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> RuntimeResult {
+        Err(RuntimeError::IllegalOperation(
+            "Division not supported for String type".to_string(),
+        ))
     }
 }
