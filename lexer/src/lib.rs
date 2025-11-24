@@ -12,8 +12,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    /// Tokenizes the source code and returns a vector of tokens. The Lexer must be mutable to keep
-    /// track of its position in the source code.
+    /// Tokenizes the source code and returns a vector of tokens. 
     ///
     /// # Errors
     /// If invalid characters or number formats are encountered.
