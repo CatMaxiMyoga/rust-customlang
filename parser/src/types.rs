@@ -7,6 +7,8 @@ pub enum Literal {
     Integer(i64),
     /// A floating-point literal.
     Float(f64),
+    /// A string literal.
+    String(String),
 }
 
 /// Represents operators.
