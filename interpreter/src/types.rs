@@ -17,22 +17,21 @@ pub enum Value {
 }
 
 impl Value {
-    fn apply<I, F>(&self, other: &Self, int_op: I, float_op: F) -> Self
+    fn apply<I, F>(&self, other: &Self, int_op: I, float_op: F) -> Result<Self, String>
     where
         I: Fn(i64, i64) -> i64,
         F: Fn(f64, f64) -> f64,
     {
         match (self, other) {
-            (Self::Integer(lhs), Self::Integer(rhs)) => Self::Integer(int_op(*lhs, *rhs)),
+            (Self::Integer(lhs), Self::Integer(rhs)) => Ok(Self::Integer(int_op(*lhs, *rhs))),
             #[allow(clippy::cast_precision_loss)]
-            (Self::Integer(lhs), Self::Float(rhs)) => Self::Float(float_op(*lhs as f64, *rhs)),
+            (Self::Integer(lhs), Self::Float(rhs)) => Ok(Self::Float(float_op(*lhs as f64, *rhs))),
             #[allow(clippy::cast_precision_loss)]
-            (Self::Float(lhs), Self::Integer(rhs)) => Self::Float(float_op(*lhs, *rhs as f64)),
-            (Self::Float(lhs), Self::Float(rhs)) => Self::Float(float_op(*lhs, *rhs)),
-            (Self::String(_), _) | (_, Self::String(_))=> {
-                eprintln!("Cannot perform arithmetic operations on strings");
-                std::process::exit(1)
-            }
+            (Self::Float(lhs), Self::Integer(rhs)) => Ok(Self::Float(float_op(*lhs, *rhs as f64))),
+            (Self::Float(lhs), Self::Float(rhs)) => Ok(Self::Float(float_op(*lhs, *rhs))),
+            (Self::String(_), _) | (_, Self::String(_)) => Err(String::from(
+                "Cannot perform arithmetic operations on strings",
+            )),
         }
     }
 }
@@ -40,15 +39,15 @@ impl Value {
 macro_rules! impl_op {
     ($trait:ident, $method:ident, $int_op:expr, $float_op:expr) => {
         impl $trait<Value> for Value {
-            type Output = Self;
-            fn $method(self, other: Self) -> Self {
+            type Output = Result<Self, String>;
+            fn $method(self, other: Self) -> Result<Self, String> {
                 self.apply(&other, $int_op, $float_op)
             }
         }
 
         impl $trait<&Value> for Value {
-            type Output = Self;
-            fn $method(self, other: &Self) -> Self {
+            type Output = Result<Self, String>;
+            fn $method(self, other: &Self) -> Result<Self, String> {
                 self.apply(other, $int_op, $float_op)
             }
         }

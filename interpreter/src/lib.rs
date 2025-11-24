@@ -108,12 +108,12 @@ impl<'a> Interpreter<'a> {
         let left: Value = self.expression(left)?;
         let right: Value = self.expression(right)?;
 
-        Ok(match operator {
+        match operator {
             Operator::Add => left + right,
             Operator::Subtract => left - right,
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
-        })
+        }
     }
 }
 
@@ -263,6 +263,25 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             "Type mismatch in assignment to variable 'x'"
+        );
+    }
+
+    #[test]
+    fn string_arithmetic() {
+        let mut environment: Environment = Environment::new();
+        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+
+        let expression: Expression = Expression::Binary {
+            left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
+            operator: Operator::Multiply,
+            right: Box::new(Expression::Literal(Literal::Integer(5))),
+        };
+        let result: Result<Value, String> = interpreter.expression(expression);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Cannot perform arithmetic operations on strings"
         );
     }
 }
