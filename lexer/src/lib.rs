@@ -522,4 +522,15 @@ mod lexer_tests {
         ];
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn boolean_literals() {
+        let result: Vec<Token> = Lexer::tokenize("true false").unwrap();
+        let expected: Vec<Token> = vec![
+            Token::new(TokenKind::Boolean(true), 1, 1),
+            Token::new(TokenKind::Boolean(false), 1, 6),
+            Token::new(TokenKind::EndOfFile, 1, 11),
+        ];
+        assert_eq!(result, expected);
+    }
 }
