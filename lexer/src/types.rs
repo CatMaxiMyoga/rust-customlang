@@ -39,6 +39,8 @@ pub enum TokenKind {
     LeftBrace,
     /// }
     RightBrace,
+    /// ,
+    Comma,
     /// =
     Equals,
     /// ;

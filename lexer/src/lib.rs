@@ -39,6 +39,7 @@ impl Lexer {
                 '-' => Some(TokenKind::Minus),
                 '*' => Some(TokenKind::Asterisk),
                 '/' => Some(TokenKind::Slash),
+                ',' => Some(TokenKind::Comma),
                 ';' => Some(TokenKind::Semicolon),
                 '=' => Some(TokenKind::Equals),
                 _ => None,
