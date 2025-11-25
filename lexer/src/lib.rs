@@ -165,6 +165,8 @@ impl Lexer {
             let identifier_str: String = identifier_vec.iter().collect();
             let kind: TokenKind = match identifier_str.as_str() {
                 "let" => TokenKind::Keyword(Keyword::Let),
+                "fn" => TokenKind::Keyword(Keyword::Fn),
+                "return" => TokenKind::Keyword(Keyword::Return),
                 "true" => TokenKind::Boolean(true),
                 "false" => TokenKind::Boolean(false),
                 identifier => TokenKind::Identifier(String::from(identifier)),
