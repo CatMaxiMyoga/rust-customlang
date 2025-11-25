@@ -303,12 +303,15 @@ left type doesn't implement division with numbers.
 ```
 
 ### Type Mismatch Error
-`TypeMismatch`
+`TypeMismatch(message)`
+
+`message`: Holds a message describing the type that was expected and the type that was given, as
+well as the operation where this error occurred.
 
 ```
 let x = 5;
 x = 5.2;
->> Error: TypeMismatch
+>> Error: TypeMismatch("Cannot assign value of type 'Float' to variable of type 'Integer'")
 ```
 
 ### Illegal Operation Error

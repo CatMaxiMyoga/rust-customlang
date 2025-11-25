@@ -59,7 +59,11 @@ impl<'a> Interpreter<'a> {
                 if let Some(old) = old
                     && discriminant(&old) != discriminant(&value)
                 {
-                    return Err(RuntimeError::TypeMismatch);
+                    let old_name: &'static str = old.get_name();
+                    let value_name: &'static str = value.get_name();
+                    return Err(RuntimeError::TypeMismatch(format!(
+                        "Cannot assign value of type '{value_name}' to variable of type '{old_name}'"
+                    )));
                 }
 
                 self.environment.insert(name, Some(value));
@@ -260,7 +264,9 @@ mod tests {
         let result: Result<(), RuntimeError> = interpreter.statement(assignment);
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), RuntimeError::TypeMismatch);
+        assert_eq!(result.unwrap_err(), RuntimeError::TypeMismatch(
+            String::from("Cannot assign value of type 'Float' to variable of type 'Integer'")
+        ));
     }
 
     #[test]
