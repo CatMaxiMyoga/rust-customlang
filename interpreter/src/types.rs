@@ -25,7 +25,7 @@ pub enum RuntimeError {
     /// let x = 5;
     /// x = 5.2;
     /// ```
-    TypeMismatch,
+    TypeMismatch(String),
 
     /// Illegal operation error. Holds a message describing the illegal operation.
     ///
@@ -80,6 +80,17 @@ pub enum RuntimeValue {
 }
 
 impl RuntimeValue {
+    /// Returns the name of the type of the `RuntimeValue` as a string slice.
+    #[must_use]
+    pub const fn get_name(&self) -> &'static str {
+        match self {
+            Self::Integer(_) => "Integer",
+            Self::Float(_) => "Float",
+            Self::String(_) => "String",
+            Self::Boolean(_) => "Boolean",
+        }
+    }
+
     fn ops(&self) -> &dyn Operations {
         match self {
             Self::Integer(_) => &IntegerOperations,
