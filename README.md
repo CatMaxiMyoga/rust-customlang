@@ -16,6 +16,7 @@ These are the currently working language features (for more precise grammar, loo
         - [Variable Reassignment](#variable-reassignment)
         - [Variable Shadowing](#variable-shadowing)
     - [Operators](#operators)
+        - [Operator Precedence](#operator-precedence)
         - [Add](#add-)
         - [Subtract](#subtract--)
         - [Multiply](#multiply-)
@@ -108,7 +109,9 @@ also be a float.
 *Dividing by zero, whether integer or float, will result in an error.*
 
 ### Floating-Point Numbers
-Also called floats. Floats can be created by writing a number with decimal places.
+Also called floats. Floats can be created by writing a number with decimal places. (currently only
+supports positive float literals, to use a negative float literal, write `0-#` where # is the
+absolute value)
 
 ```
 5.2;
@@ -124,6 +127,8 @@ If your number is between `0` and `1`, you can leave out the `0` and just write 
 ```
 
 **Any** operation using the currently 4 existing [operators](#operators) will result in a float.
+
+Note that simply doing `5.` is **not** allowed and in fact **invalid**. instead, do `5.0`.
 
 *Dividing by zero, whether integer or float, will result in an error.*
 
@@ -210,6 +215,17 @@ Note that the old variable will not exist anymore, meaning in the above example 
 forever.
 
 ## Operators
+### Operator Precedence
+Of course, this language respects operator precedence, meaning multiplication and division before
+addition and subtraction, and parentheses before all.
+```
+5 + 5 * 2;
+>> 15
+
+(5 + 5) * 2;
+>> 20
+```
+
 ### Add `+`
 To add two values together, if permitted, write it like this:
 
@@ -316,12 +332,12 @@ let x = y + 5;
 ```
 
 ### Variable Uninitialized Error
-`VariableUnitialized(identifier)`
+`VariableUninitialized(identifier)`
 
 `identifier`: Holds the name of the uninitialized variable.
 
 ```
 let x;
 x + 5;
->> Error: VariableUnitialized("x")
+>> Error: VariableUninitialized("x")
 ```
