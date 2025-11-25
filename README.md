@@ -17,7 +17,7 @@ These are the currently working language features (for more precise grammar, loo
     - [Variable Shadowing](#variable-shadowing)
   - [Operators](#operators)
     - [Add](#add-)
-    - [Subtract](#subtract-)
+    - [Subtract](#subtract--)
     - [Multiply](#multiply-)
     - [Divide](#divide-)
 
