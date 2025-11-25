@@ -31,8 +31,7 @@ Term = Factor, { _, ("*" | "/"), _, Factor } ;
 Factor = Literal | Identifier | FunctionCall | "(", _, Expression, _, ")" ;
 
 FunctionCall = Identifier, _, "(", _, FunctionCallArguments, _, ")" ;
-FunctionCallArguments = [ FunctionCallArgument, { _, ",", _, FunctionCallArgument } ] ;
-FunctionCallArgument = VariableAssignment | Identifier ;
+FunctionCallArguments = [ Expression, { _, ",", _, Expression } ] ;
 
 (* STATEMENTS *)
 
@@ -45,5 +44,5 @@ VariableAssignment = Identifier, _, "=", _, Expression ;
 FunctionDeclaration = "fn", __, Identifier, _,
   "(", _, FunctionDeclarationParameters, _, ")",
   "{", _, Program, [ ReturnStatement ], _, "}" ;
-FunctionDeclarationParameters = [ Identifier, { _, ",", _, Identifier } ] ;
+FunctionDeclarationParameters = [ Identifier, { _, ",", _, Identifier }, _, [ "," ] ] ;
 ReturnStatement = "return", __, Expression, _ ;
