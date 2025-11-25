@@ -1,9 +1,32 @@
+I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
+These are the currently working language features (for more precise grammar, look at 
+[customlang.ebnf](grammar/customlang.ebnf)):
+
+# Table of Contents
+- [Language Features](#language-features)
+  - [Currently Supported Literals](#currently-supported-literals)
+    - [Strings](#strings)
+    - [Integers](#integers)
+    - [Floating-Point Numbers (floats)](#floating-point-numbers)
+    - [Booleans](#booleans)
+  - [Identifiers](#identifiers)
+  - [Variables](#variables)
+    - [Variable Declaration](#variable-declaration)
+    - [Delayed Variable Initialization](#delayed-variable-initialization)
+    - [Variable Reassignment](#variable-reassignment)
+    - [Variable Shadowing](#variable-shadowing)
+  - [Operators](#operators)
+    - [Add](#add-)
+    - [Subtract](#subtract-)
+    - [Multiply](#multiply-)
+    - [Divide](#divide-)
+
 # Language Features
 
-## Currently supported literals
-
+## Currently Supported Literals
 ### Strings
 String literals can be created using the typical `"text"` syntax.
+
 ```"Hello";```
 
 Strings also support all common escape sequences (and a few less common ones, like `"\a"`). All
@@ -35,6 +58,7 @@ Strings do **not** allow any other operations using the currently 4 existing
 ### Integers
 Integer literals can be created by just typing an integer (currently only supports positive
 integer literals, to use a negative integer literal, write `0-#` where # is the absolute value)
+
 ```123;```
 
 Integers implement all 4 currently existing [operators](#operators).
@@ -79,6 +103,7 @@ also be a float.
 
 ### Floating-Point Numbers
 Also called floats. Floats can be created by writing a number with decimal places.
+
 ```
 5.2;
 ```
@@ -117,7 +142,7 @@ hello_123_world__;
 ```
 
 ## Variables
-### Variable declaration
+### Variable Declaration
 Currently, all variables are mutable. Variables can hold any of the currently 4 existing types
 (string, integer, float, boolean). Variables are declared by using the `let` keyword, followed by
 at least one whitespace character, following an `identifier` (the name of the variable), followed
@@ -131,7 +156,7 @@ let y = 5;
 If the variable is **not** initialized, it has no type. Uninitialized variables can later be
 initialized using [delayed variable initialization](#delayed-variable-initialization). If the
 variable is initialized upon declaration (also called immediate initialization), the variable will
-have the type of the value assigned to it. In the above example, y hold the type `Integer`.
+have the type of the value assigned to it. In the above example, y holds the type `Integer`.
 
 ### Delayed Variable Initialization
 Variables can be initialized **at** declaration or afterwards. Initializing an already declared
@@ -175,17 +200,18 @@ let x = 5;
 let x = "Hello";
 ```
 
-Note that the old variable will not exist anymore, meaning in the above example, that `5` is lost
+Note that the old variable will not exist anymore, meaning in the above example `5` is lost
 forever.
 
 ## Operators
 ### Add `+`
 To add two values together, if permitted, write it like this:
+
 ```
 lhs + rhs;
 ```
 
-`lsh` and `rhs` are both expressions. If the left type implements addition for the right type, this
+`lhs` and `rhs` are both expressions. If the left type implements addition for the right type, this
 will return the result of that. If the left type returns an error for the right type, or it returns
 an error for this operator, it will result in an error.
 ```
@@ -195,11 +221,12 @@ an error for this operator, it will result in an error.
 
 ### Subtract `-`
 To subtract a value from another, if permitted, write it like this:
+
 ```
 lhs - rhs;
 ```
 
-`lsh` and `rhs` are both expressions. If the left type implements subtraction for the right type,
+`lhs` and `rhs` are both expressions. If the left type implements subtraction for the right type,
 this will return the result of that. If the left type returns an error for the right type, or it
 returns an error for this operator, it will result in an error.
 ```
@@ -209,11 +236,12 @@ returns an error for this operator, it will result in an error.
 
 ### Multiply `*`
 To multiply two values together, if permitted, write it like this:
+
 ```
 lhs * rhs;
 ```
 
-`lsh` and `rhs` are both expressions. If the left type implements multiplication for the right
+`lhs` and `rhs` are both expressions. If the left type implements multiplication for the right
 type, this will return the result of that. If the left type returns an error for the right type, or
 it returns an error for this operator, it will result in an error.
 ```
@@ -222,17 +250,18 @@ it returns an error for this operator, it will result in an error.
 ```
 
 ### Divide `/`
-To divide a value from another, if permitted, write it like this:
+To divide a value by another, if permitted, write it like this:
+
 ```
 lhs / rhs;
 ```
 
-`lsh` and `rhs` are both expressions. If the left type implements division for the right type, this
+`lhs` and `rhs` are both expressions. If the left type implements division for the right type, this
 will return the result of that. If the left type returns an error for the right type, or it returns
 an error for this operator, it will result in an error.
 ```
 "Test" / 2;
->> Error: IllegalOperation("Subtraction not supported for String type")
+>> Error: IllegalOperation("Division not supported for String type")
 ```
 
 Any division by zero, whether float or integer results in a `DivisionByZero` error, unless the
@@ -240,4 +269,53 @@ left type doesn't implement division with numbers.
 ```
 10 / 0;
 >> Error: DivisionByZero
+```
+
+## Errors
+### Division By Zero Error
+`DivisionByZero`
+
+```
+5 / 0;
+>> Error: DivisionByZero,
+```
+
+### Type Mismatch Error
+`TypeMismatch`
+
+```
+let x = 5;
+x = 5.2;
+>> Error: TypeMismatch
+```
+
+### Illegal Operation Error
+`IllegalOperation(message)`
+
+`message`: Holds a message describing the illegal operation.
+
+```
+5 + "Hello";
+>> Error: IllegalOperation("Cannot add Integer with non-numeric type")
+```
+
+### Variable Not Found Error
+`VariableNotFound(identifier)`
+
+`identifier`: Holds the name of the missing variable.
+
+```
+let x = y + 5;
+>> Error: VariableNotFound("y")
+```
+
+### Variable Uninitialized Error
+`VariableUnitialized(identifier)`
+
+`identifier`: Holds the name of the uninitialized variable.
+
+```
+let x;
+x + 5;
+>> Error: VariableUnitialized("x")
 ```
