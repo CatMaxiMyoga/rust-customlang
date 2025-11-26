@@ -23,6 +23,7 @@ Float = [ Integer ], ".", Integer ;
 String = '"', { Character - ("\" | '"') | EscapeSequence }, '"' ;
 
 Identifier = Letter, { Letter | Digit | "_" } ;
+Type = Identifier ;
 
 Literal = Integer | Float | String ;
 
@@ -38,11 +39,15 @@ FunctionCallArguments = [ Expression, { _, ",", _, Expression } ] ;
 Statement = _, (VariableDeclaration | Expression | FunctionDeclaration), _, ";", _ ;
 Program = { Statement } ;
 
-VariableDeclaration = "let", __, Identifier, _, "=", _, Expression ;
+VariableDeclaration = Type, __, Identifier, _, "=", _, Expression ;
 VariableAssignment = Identifier, _, "=", _, Expression ;
 
-FunctionDeclaration = "fn", __, Identifier, _,
+FunctionDeclaration = Type, __, Identifier, _,
   "(", _, FunctionDeclarationParameters, _, ")",
   "{", _, Program, [ ReturnStatement ], _, "}" ;
-FunctionDeclarationParameters = [ Identifier, { _, ",", _, Identifier }, _, [ "," ] ] ;
+FunctionDeclarationParameters = [
+  Type, __, Identifier,
+  { _, ",", _, Type, __, Identifier },
+  _, [ "," ]
+] ;
 ReturnStatement = "return", __, Expression, _ ;
