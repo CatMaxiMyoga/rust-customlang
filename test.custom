@@ -1,6 +1,6 @@
-fn x(y) { return y * y; }
-let y = 2;
-fn a(b) { return x(b) + x(b); }
-println(a(y));
-fn b(c) { return y + c; }
-println(b(5));
+Integer x(Integer y) { return y * y; }
+Integer y = 2;
+Integer a(Integer b) { return x(b) + x(b); }
+println(IntToString(a(y)));
+Integer b(Integer c, Integer y) { return y + c; }
+println(IntToString(b(5, y)));
