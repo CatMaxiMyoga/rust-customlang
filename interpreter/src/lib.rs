@@ -3,10 +3,9 @@
 pub mod types;
 
 use parser::types::{Expression, Literal, Operator, Program, Statement};
-use std::mem::discriminant;
 use types::{ExpressionResult, RuntimeError, RuntimeValue};
 
-use crate::types::{Scope, StatementResult};
+use crate::types::{Scope, StatementResult, Type};
 
 /// The interpreter for the programming language.
 pub struct Interpreter<'a> {
@@ -20,7 +19,7 @@ impl<'a> Interpreter<'a> {
     /// Errors if runtime errors.
     pub fn run(program: Program, scope: &'a mut Scope) -> Result<(), RuntimeError> {
         let mut interpreter: Self = Self { scope };
-        interpreter.builtins();
+        interpreter.builtins()?;
 
         for statement in program.statements {
             interpreter.statement(statement)?;
@@ -34,64 +33,101 @@ impl<'a> Interpreter<'a> {
         Self { scope }
     }
 
-    fn builtins(&mut self) {
+    fn builtins(&mut self) -> Result<(), RuntimeError> {
         self.scope.variables.insert(
             String::from("print"),
-            Some(RuntimeValue::BuiltinFunction {
-                parameters: 1,
-                implementation: |_, args| {
-                    match &args[0] {
-                        RuntimeValue::String(c) => print!("{c}"),
-                        RuntimeValue::Integer(c) => print!("{c}"),
-                        RuntimeValue::Float(c) => print!("{c}"),
-                        RuntimeValue::Boolean(c) => print!("{c}"),
-                        _ => {
-                            return Err(RuntimeError::TypeMismatch(
-                                "Unsupported type for print function".to_owned(),
-                            ));
+            (
+                Type::new("Void")?,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters: vec!["String"],
+                    implementation: |_, args: Vec<RuntimeValue>| {
+                        match &args[0] {
+                            RuntimeValue::String(c) => print!("{c}"),
+                            _ => unreachable!(),
                         }
-                    }
-                    Ok(RuntimeValue::Void)
-                },
-            }),
+                        Ok(RuntimeValue::Void)
+                    },
+                }),
+            ),
         );
 
         self.scope.variables.insert(
             String::from("println"),
-            Some(RuntimeValue::BuiltinFunction {
-                parameters: 1,
-                implementation: |_, args| {
-                    match &args[0] {
-                        RuntimeValue::String(c) => println!("{c}"),
-                        RuntimeValue::Integer(c) => println!("{c}"),
-                        RuntimeValue::Float(c) => println!("{c}"),
-                        RuntimeValue::Boolean(c) => println!("{c}"),
-                        _ => {
-                            return Err(RuntimeError::TypeMismatch(
-                                "Unsupported type for println function".to_owned(),
-                            ));
+            (
+                Type::new("Void")?,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters: vec!["String"],
+                    implementation: |_, args: Vec<RuntimeValue>| {
+                        match &args[0] {
+                            RuntimeValue::String(c) => println!("{c}"),
+                            _ => unreachable!(),
                         }
-                    }
-                    Ok(RuntimeValue::Void)
-                },
-            }),
+                        Ok(RuntimeValue::Void)
+                    },
+                }),
+            ),
         );
+
+        self.scope.variables.insert(
+            String::from("IntToString"),
+            (
+                Type::new("String")?,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters: vec!["Integer"],
+                    implementation: |_, args: Vec<RuntimeValue>| match &args[0] {
+                        RuntimeValue::Integer(i) => Ok(RuntimeValue::String(i.to_string())),
+                        _ => unreachable!(),
+                    },
+                }),
+            ),
+        );
+
+        self.scope.variables.insert(
+            String::from("FloatToString"),
+            (
+                Type::new("String")?,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters: vec!["Float"],
+                    implementation: |_, args: Vec<RuntimeValue>| match &args[0] {
+                        RuntimeValue::Float(i) => Ok(RuntimeValue::String(i.to_string())),
+                        _ => unreachable!(),
+                    },
+                }),
+            ),
+        );
+
+        self.scope.variables.insert(
+            String::from("BoolToString"),
+            (
+                Type::new("String")?,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters: vec!["Boolean"],
+                    implementation: |_, args: Vec<RuntimeValue>| match &args[0] {
+                        RuntimeValue::Boolean(i) => Ok(RuntimeValue::String(i.to_string())),
+                        _ => unreachable!(),
+                    },
+                }),
+            ),
+        );
+
+        Ok(())
     }
 
     fn statement(&mut self, statement: Statement) -> Result<(), RuntimeError> {
         match statement {
             Statement::Expression(expr) => _ = self.expression(expr)?,
-            Statement::VariableDeclaration { name, value } => {
-                self.variable_declaration_statement(&name, value)?;
+            Statement::VariableDeclaration { type_, name, value } => {
+                self.variable_declaration_statement(&type_, &name, value)?;
             }
             Statement::VariableAssignment { name, value } => {
                 self.variable_assignment_statement(&name, value)?;
             }
             Statement::FunctionDeclaration {
+                return_type,
                 name,
                 parameters,
                 body,
-            } => self.function_declaration_statement(&name, parameters, body)?,
+            } => self.function_declaration_statement(&return_type, &name, &parameters, body)?,
             Statement::Return(_) => return Err(RuntimeError::IllegalReturn),
         }
 
@@ -100,10 +136,11 @@ impl<'a> Interpreter<'a> {
 
     fn variable_declaration_statement(
         &mut self,
+        type_: &str,
         name: &str,
         value: Option<Expression>,
     ) -> StatementResult {
-        if let Some(Some(old_var)) = self.scope.variables.get(name)
+        if let Some((_, Some(old_var))) = self.scope.variables.get(name)
             && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
         {
             return Err(RuntimeError::IllegalOperation(format!(
@@ -123,21 +160,27 @@ impl<'a> Interpreter<'a> {
             ));
         }
 
-        self.scope.variables.insert(name.to_owned(), value);
+        if type_ == "Void" {
+            return Err(RuntimeError::TypeMismatch(
+                "Cannot declare variable of type 'Void'.".to_owned(),
+            ));
+        }
+
+        self.scope
+            .variables
+            .insert(name.to_owned(), (Type::new(type_)?, value));
 
         Ok(())
     }
 
     fn variable_assignment_statement(&mut self, name: &str, value: Expression) -> StatementResult {
-        let old: Option<RuntimeValue> = if let Some(val) = self.scope.variables.get(name) {
+        let old: (Type, Option<RuntimeValue>) = if let Some(val) = self.scope.variables.get(name) {
             val.clone()
         } else {
             return Err(RuntimeError::VariableNotFound(name.to_owned()));
         };
 
-        if let Some(old_var) = old.clone()
-            && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
-        {
+        if old.0.0 == "Function" || old.0.0 == "Builtin (Function)" {
             return Err(RuntimeError::TypeMismatch(format!(
                 "Cannot assign value to function variable '{name}'"
             )));
@@ -145,10 +188,8 @@ impl<'a> Interpreter<'a> {
 
         let value: RuntimeValue = self.expression(value)?;
 
-        if let Some(old) = old
-            && discriminant(&old) != discriminant(&value)
-        {
-            let old_name: &'static str = old.get_name();
+        if old.0.0 != value.get_name() {
+            let old_name: String = old.0.0;
             let value_name: &'static str = value.get_name();
             return Err(RuntimeError::TypeMismatch(format!(
                 "Cannot assign value of type '{value_name}' to variable of type '{old_name}'"
@@ -161,15 +202,18 @@ impl<'a> Interpreter<'a> {
             ));
         }
 
-        self.scope.variables.insert(name.to_owned(), Some(value));
+        self.scope
+            .variables
+            .insert(name.to_owned(), (old.0, Some(value)));
 
         Ok(())
     }
 
     fn function_declaration_statement(
         &mut self,
+        return_type: &str,
         name: &str,
-        parameters: Vec<String>,
+        parameters: &Vec<(String, String)>,
         body: Vec<Statement>,
     ) -> StatementResult {
         if self.scope.variables.contains_key(name) {
@@ -178,8 +222,18 @@ impl<'a> Interpreter<'a> {
             )));
         }
 
-        let function: RuntimeValue = RuntimeValue::Function { parameters, body };
-        self.scope.variables.insert(name.to_owned(), Some(function));
+        let mut params: Vec<(Type, String)> = Vec::new();
+        for (type_, name) in parameters {
+            params.push((Type::new(type_)?, name.to_owned()));
+        }
+
+        let function: RuntimeValue = RuntimeValue::Function {
+            parameters: params,
+            body,
+        };
+        self.scope
+            .variables
+            .insert(name.to_owned(), (Type::new(return_type)?, Some(function)));
 
         Ok(())
     }
@@ -194,25 +248,25 @@ impl<'a> Interpreter<'a> {
             } => self.binary_expression(*left, &operator, *right),
             Expression::Identifier(identifier) => {
                 if self.scope.variables.contains_key(&identifier) {
-                    self.scope.variables[&identifier].as_ref().map_or_else(
+                    self.scope.variables[&identifier].1.as_ref().map_or_else(
                         || Err(RuntimeError::VariableUninitialized(identifier)),
                         |value| Ok(value.clone()),
                     )
                 } else if let Some(variable) = &self.scope.find_in_parent(&identifier) {
                     match variable {
-                        Some(value) => match value {
+                        (_, Some(value)) => match value {
                             RuntimeValue::Function { .. }
                             | RuntimeValue::BuiltinFunction { .. } => Ok(value.clone()),
                             _ => Err(RuntimeError::VariableNotFound(identifier)),
                         },
-                        None => Err(RuntimeError::VariableUninitialized(identifier)),
+                        (_, None) => Err(RuntimeError::VariableUninitialized(identifier)),
                     }
                 } else {
                     Err(RuntimeError::VariableNotFound(identifier))
                 }
             }
             Expression::FunctionCall { name, arguments } => {
-                self.function_call_expression(&name, arguments)
+                self.function_call_expression(&name, &arguments)
             }
         }
     }
@@ -246,10 +300,12 @@ impl<'a> Interpreter<'a> {
     fn function_call_expression(
         &mut self,
         name: &str,
-        arguments: Vec<Expression>,
+        arguments: &[Expression],
     ) -> ExpressionResult {
+        type FunctionData = (Type, Vec<(Type, String)>, Vec<Statement>);
+
         if !self.scope.variables.contains_key(name) {
-            if let Some(Some(func)) = self.scope.find_in_parent(name) {
+            if let Some((_, Some(func))) = self.scope.find_in_parent(name) {
                 match func {
                     RuntimeValue::BuiltinFunction { .. } => {
                         return self.builtin_function_call_expression(name, arguments);
@@ -264,21 +320,21 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        let function: (Vec<String>, Vec<Statement>) = match self.scope.variables.get(name) {
-            Some(Some(RuntimeValue::Function { parameters, body })) => {
-                (parameters.clone(), body.clone())
+        let function: FunctionData = match self.scope.variables.get(name) {
+            Some((return_type, Some(RuntimeValue::Function { parameters, body }))) => {
+                (return_type.to_owned(), parameters.clone(), body.clone())
             }
-            Some(Some(RuntimeValue::BuiltinFunction { .. })) => {
+            Some((_, Some(RuntimeValue::BuiltinFunction { .. }))) => {
                 return self.builtin_function_call_expression(name, arguments);
             }
             None => {
-                if let Some(Some(func)) = self.scope.find_in_parent(name) {
+                if let Some((return_type, Some(func))) = self.scope.find_in_parent(name) {
                     match func {
                         RuntimeValue::BuiltinFunction { .. } => {
                             return self.builtin_function_call_expression(name, arguments);
                         }
                         RuntimeValue::Function { parameters, body } => {
-                            (parameters.clone(), body.clone())
+                            (return_type.to_owned(), parameters.clone(), body.clone())
                         }
                         _ => {
                             return Err(RuntimeError::VariableNotFound(name.to_owned()));
@@ -299,23 +355,39 @@ impl<'a> Interpreter<'a> {
 
         let mut interpreter: Interpreter = Interpreter { scope: &mut scope };
 
-        if arguments.len() != function.0.len() {
+        if arguments.len() != function.1.len() {
             return Err(RuntimeError::IllegalArgumentCount(arguments.len()));
         }
 
-        for (i, parameter) in function.0.iter().enumerate() {
+        for (i, (type_, name)) in function.1.iter().enumerate() {
             let argument_value: RuntimeValue = self.expression(arguments[i].clone())?;
             interpreter
                 .scope
                 .variables
-                .insert(parameter.clone(), Some(argument_value));
+                .insert(name.clone(), (type_.clone(), Some(argument_value)));
         }
 
-        for statement in function.1.iter().cloned() {
+        for statement in function.2.iter().cloned() {
             if let Statement::Return(value) = statement {
-                return interpreter.expression(value);
+                let value: RuntimeValue = interpreter.expression(value)?;
+                if function.0.0 != value.get_name() {
+                    return Err(RuntimeError::TypeMismatch(
+                        format!(
+                            "Function '{name}' expected to return type '{}' ",
+                            function.0.0,
+                        ) + &format!("but returned type '{}'", value.get_name()),
+                    ));
+                }
+                return Ok(value);
             }
             interpreter.statement(statement)?;
+        }
+
+        if function.0.0 != "Void" {
+            return Err(RuntimeError::TypeMismatch(format!(
+                "Function '{name}' expected to return type '{}', but no return statement was found.",
+                function.0.0
+            )));
         }
 
         Ok(RuntimeValue::Void)
@@ -324,32 +396,57 @@ impl<'a> Interpreter<'a> {
     fn builtin_function_call_expression(
         &mut self,
         name: &str,
-        arguments: Vec<Expression>,
+        arguments: &[Expression],
     ) -> ExpressionResult {
         type BuiltinFunctionImpl = fn(&mut Scope, Vec<RuntimeValue>) -> ExpressionResult;
-        type BuiltinFunction = (usize, BuiltinFunctionImpl);
+        type BuiltinFunction = (Type, Vec<&'static str>, BuiltinFunctionImpl);
 
         let builtin: BuiltinFunction = match self.scope.variables.get(name) {
-            Some(Some(RuntimeValue::BuiltinFunction {
-                parameters,
-                implementation,
-            })) => (*parameters, *implementation),
+            Some((
+                return_type,
+                Some(RuntimeValue::BuiltinFunction {
+                    parameters,
+                    implementation,
+                }),
+            )) => (return_type.clone(), parameters.clone(), *implementation),
             _ => {
                 unreachable!()
             }
         };
 
-        if arguments.len() != builtin.0 {
+        if arguments.len() != builtin.1.len() {
             return Err(RuntimeError::IllegalArgumentCount(arguments.len()));
         }
 
         let mut args: Vec<RuntimeValue> = Vec::new();
 
-        for argument in arguments {
-            args.push(self.expression(argument)?);
+        for (i, type_) in builtin.1.iter().enumerate() {
+            let argument: RuntimeValue = self.expression(arguments[i].clone())?;
+
+            if argument.get_name() != *type_ {
+                return Err(RuntimeError::TypeMismatch(
+                    format!(
+                        "Builtin function '{name}' expected argument {} to be of type '{}' ",
+                        i + 1,
+                        type_,
+                    ) + &format!("but got type '{}'", argument.get_name()),
+                ));
+            }
+
+            args.push(argument);
         }
 
-        builtin.1(self.scope, args)
+        let result: RuntimeValue = builtin.2(self.scope, args)?;
+
+        if builtin.0.0 != result.get_name() {
+            return Err(RuntimeError::TypeMismatch(
+                format!(
+                    "Builtin function '{name}' expected to return type '{}' ",
+                    builtin.0.0,
+                ) + &format!("but returned type '{}'", result.get_name()),
+            ));
+        }
+        Ok(result)
     }
 }
 
@@ -428,12 +525,13 @@ mod tests {
         let mut scope: Scope = Scope::default();
         let mut interpreter: Interpreter = Interpreter::new(&mut scope);
         let declaration: Statement = Statement::VariableDeclaration {
+            type_: String::from("Integer"),
             name: String::from("x"),
             value: None,
         };
         interpreter.statement(declaration).unwrap();
         assert!(scope.variables.contains_key("x"));
-        assert!(scope.variables["x"].is_none());
+        assert!(scope.variables["x"].1.is_none());
     }
 
     #[test]
@@ -442,19 +540,22 @@ mod tests {
         let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let declaration: Statement = Statement::VariableDeclaration {
+            type_: String::from("Integer"),
             name: String::from("x"),
             value: Some(Expression::Literal(Literal::Integer(10))),
         };
         interpreter.statement(declaration).unwrap();
 
         assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"], Some(RuntimeValue::Integer(10)));
+        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Integer(10)));
     }
 
     #[test]
     fn variable_delayed_initialization() {
         let mut scope: Scope = Scope::default();
-        scope.variables.insert(String::from("x"), None);
+        scope
+            .variables
+            .insert(String::from("x"), (Type::new("Float").unwrap(), None));
         let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {
@@ -464,15 +565,19 @@ mod tests {
         interpreter.statement(assignment).unwrap();
 
         assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"], Some(RuntimeValue::Float(20.0)));
+        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Float(20.0)));
     }
 
     #[test]
     fn variable_reassignment() {
         let mut scope: Scope = Scope::default();
-        scope
-            .variables
-            .insert(String::from("x"), Some(RuntimeValue::Integer(10)));
+        scope.variables.insert(
+            String::from("x"),
+            (
+                Type::new("Integer").unwrap(),
+                Some(RuntimeValue::Integer(10)),
+            ),
+        );
         let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {
@@ -482,15 +587,19 @@ mod tests {
         interpreter.statement(assignment).unwrap();
 
         assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"], Some(RuntimeValue::Integer(30)));
+        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Integer(30)));
     }
 
     #[test]
     fn variable_type_mismatch() {
         let mut scope: Scope = Scope::default();
-        scope
-            .variables
-            .insert(String::from("x"), Some(RuntimeValue::Integer(10)));
+        scope.variables.insert(
+            String::from("x"),
+            (
+                Type::new("Integer").unwrap(),
+                Some(RuntimeValue::Integer(10)),
+            ),
+        );
         let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {

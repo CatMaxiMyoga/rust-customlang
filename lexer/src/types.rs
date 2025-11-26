@@ -3,10 +3,6 @@
 /// Defines the different keywords recognized by the lexer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
-    /// Let keyword, used for variable declarations.
-    Let,
-    /// Fn keyword, used for function definitions.
-    Fn,
     /// Return keyword, used for returning values from functions.
     Return,
 }

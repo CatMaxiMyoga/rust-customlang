@@ -56,6 +56,8 @@ pub enum Expression {
 pub enum Statement {
     /// A variable declaration statement.
     VariableDeclaration {
+        /// The type of the variable.
+        type_: String,
         /// The name of the variable.
         name: String,
         /// The initial value of the variable.
@@ -70,10 +72,12 @@ pub enum Statement {
     },
     /// A function declaration statement.
     FunctionDeclaration {
+        /// The return type of the function.
+        return_type: String,
         /// The name of the function.
         name: String,
-        /// The parameters of the function.
-        parameters: Vec<String>,
+        /// The parameters of the function `(Type, Identifier)`.
+        parameters: Vec<(String, String)>,
         /// The body of the function.
         body: Vec<Statement>,
     },

@@ -100,9 +100,22 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
-        if self.match_token(&TokenKind::Keyword(Keyword::Let)) {
+        //if self.match_token(&TokenKind::Keyword(Keyword::Let)) {
+        if self.check_next_tokens(&[
+            TokenKind::Identifier(String::new()),
+            TokenKind::Identifier(String::new()),
+            TokenKind::Equals,
+        ]) || self.check_next_tokens(&[
+            TokenKind::Identifier(String::new()),
+            TokenKind::Identifier(String::new()),
+            TokenKind::Semicolon,
+        ]) {
             self.parse_variable_declaration()
-        } else if self.match_token(&TokenKind::Keyword(Keyword::Fn)) {
+        } else if self.check_next_tokens(&[
+            TokenKind::Identifier(String::new()),
+            TokenKind::Identifier(String::new()),
+            TokenKind::LeftParen,
+        ]) {
             self.parse_function_declaration()
         } else if self.match_token(&TokenKind::Keyword(Keyword::Return)) {
             if !self.outside_global_scope {
@@ -122,13 +135,15 @@ impl Parser {
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
-        let identifier: String = match &self.peek()?.kind {
+        let type_: String = match &self.peek()?.kind {
             TokenKind::Identifier(name) => name.clone(),
-            token => {
-                return Err(format!(
-                    "Expected identifier after 'let', found '{token:?}'"
-                ));
-            }
+            _ => unreachable!(),
+        };
+        self.advance();
+
+        let name: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => unreachable!(),
         };
         self.advance();
 
@@ -139,23 +154,25 @@ impl Parser {
         };
 
         self.expect_token(&TokenKind::Semicolon)?;
-        Ok(Statement::VariableDeclaration {
-            name: identifier,
-            value,
-        })
+        Ok(Statement::VariableDeclaration { type_, name, value })
     }
 
     fn parse_function_declaration(&mut self) -> Result<Statement, String> {
-        let name: String = match &self.peek()?.kind {
+        let return_type: String = match &self.peek()?.kind {
             TokenKind::Identifier(name) => name.clone(),
-            _ => {
-                return Err(String::from("Expected identifier after 'fn'"));
-            }
+            _ => unreachable!()
         };
         self.advance();
+
+        let name: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => unreachable!()
+        };
+        self.advance();
+
         self.expect_token(&TokenKind::LeftParen)?;
 
-        let parameters: Vec<String> = self.parse_function_declaration_parameters()?;
+        let parameters: Vec<(String, String)> = self.parse_function_declaration_parameters()?;
 
         self.expect_token(&TokenKind::LeftBrace)?;
 
@@ -167,14 +184,15 @@ impl Parser {
         self.outside_global_scope = false;
 
         Ok(Statement::FunctionDeclaration {
+            return_type,
             name,
             parameters,
             body,
         })
     }
 
-    fn parse_function_declaration_parameters(&mut self) -> Result<Vec<String>, String> {
-        let mut parameters: Vec<String> = Vec::new();
+    fn parse_function_declaration_parameters(&mut self) -> Result<Vec<(String, String)>, String> {
+        let mut parameters: Vec<(String, String)> = Vec::new();
 
         loop {
             if self.match_token(&TokenKind::RightParen) {
@@ -183,10 +201,17 @@ impl Parser {
 
             let identifier: &Token =
                 self.expect_token_kind(&TokenKind::Identifier(String::new()))?;
-            let TokenKind::Identifier(name) = &identifier.kind else {
-                unreachable!("Checked for identifier token before")
+            let TokenKind::Identifier(type_) = &identifier.kind.clone() else {
+                unreachable!()
             };
-            parameters.push(name.clone());
+
+            let identifier: &Token =
+                self.expect_token_kind(&TokenKind::Identifier(String::new()))?;
+            let TokenKind::Identifier(name) = &identifier.kind else {
+                unreachable!()
+            };
+
+            parameters.push((type_.clone(), name.clone()));
 
             match self.peek()?.kind {
                 TokenKind::Comma => {

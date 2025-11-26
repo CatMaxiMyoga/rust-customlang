@@ -18,12 +18,16 @@ These are the currently working language features (for more precise grammar, loo
         - [Delayed Variable Initialization](#delayed-variable-initialization)
         - [Variable Reassignment](#variable-reassignment)
         - [Variable Shadowing](#variable-shadowing)
+    - [Types](#types)
     - [Functions](#functions)
         - [Function Declaration](#function-declaration)
         - [Function Call](#function-call)
         - [Builtin Functions](#builtin-functions)
-            - [`print(c)`](#builtin-print)
-            - [`println(c)`](#builtin-println)
+            - [`print(String)`](#builtin-print)
+            - [`println(String)`](#builtin-println)
+            - [`IntToString(Integer)`](#builtin-tostring)
+            - [`FloatToString(Float)`](#builtin-tostring)
+            - [`BoolToString(Boolean)`](#builtin-tostring)
     - [Operators](#operators)
         - [Operator Precedence](#operator-precedence)
         - [Add `+`](#add-)
@@ -39,6 +43,7 @@ These are the currently working language features (for more precise grammar, loo
         - [NameConflict](#name-conflict-error)
         - [IllegalArgumentCount](#illegal-argument-count-error)
         - [IllegalReturn](#illegal-return-error)
+        - [InvalidType](#invalid-type-error)
 
 # Language Features
 
@@ -167,13 +172,13 @@ hello_123_world__;
 ## Variables
 ### Variable Declaration
 Currently, all variables are mutable. Variables can hold any of the currently 4 existing types
-(string, integer, float, boolean). Variables are declared by using the `let` keyword, followed by
-at least one whitespace character, following an `identifier` (the name of the variable), followed
-by either a semicolon `;`, declaring the end of the statement, or an equals sign `=`, declaring an
-immediate initialization, followed by an expression (the value).
+(string, integer, float, boolean). Variables are declared by specifying the [type](#types),
+followed by at least one whitespace character, following an [identifier](#identifiers) (the name
+of the variable), followed by either a semicolon `;`, declaring the end of the statement, or an
+equals sign `=`, declaring an immediate initialization, followed by an expression (the value).
 ```
-let x;
-let y = 5;
+Integer x;
+Integer y = 5;
 ```
 
 If the variable is **not** initialized, it has no type. Uninitialized variables can later be
@@ -183,28 +188,23 @@ have the type of the value assigned to it. In the above example, y holds the typ
 
 ### Delayed Variable Initialization
 Variables can be initialized **at** declaration or afterwards. Initializing an already declared
-variable is the exact same as [variable reassignment](#variable-reassignment), except that you
-don't have to worry about using the right type, since the variable doesn't have a type yet.
+variable is the exact same as [variable reassignment](#variable-reassignment).
 ```
-let x;
+Integer x;
 x = 5;
 
-let y;
+String y;
 y = "Hello";
 ```
-
-After the variable has been initialized (whether delayed or immediate), it holds the type of the
-result of the expression following the `=`, which, in the case of a literal, is just the type of
-the literal.
 
 *Identifiers holding functions **cannot** be used as variable names, as function variables are not
 allowed to be overwritten!*
 
 ### Variable Reassignment
 Also called variable updating. To reassign a variable to a new value, simply use the variable's
-identifier without the `let` keyword before it.
+identifier without the [type](#types) before it.
 ```
-let x = 5;
+Integer x = 5;
 x = 10;
 ```
 
@@ -212,7 +212,7 @@ Note that this **will** require the type of the expression following the `=` to 
 variable is holding. If you want to store the value in the variable regardless, look at
 [variable shadowing](#variable-shadowing). This means the following is **not** valid:
 ```
-let x = 5;
+Integer x = 5;
 x = "Hello";
 >> Error: TypeMismatch
 ```
@@ -225,8 +225,8 @@ Also called variable redeclaration. It basically deletes the old variable and ov
 the new one, meaning the variable doesn't hold a type anymore either, letting you choose a new type
 for the variable.
 ```
-let x = 5;
-let x = "Hello";
+Integer x = 5;
+String x = "Hello";
 ```
 
 Note that the old variable will not exist anymore, meaning in the above example `5` is lost
@@ -235,24 +235,35 @@ forever.
 *Identifiers holding functions **cannot** be used as variable names, as function variables are not
 allowed to be overwritten!*
 
+## Types
+Types are [identifiers](#identifiers) that represent the type a variable holds, the type a function
+returns or the type a parameter has to be. Types are put before `identifiers` that represent the
+name of the function or variable. There's currently 5 valid types.
+
+- `Integer` (See [Integers](#integers))
+- `Float` (See [Floating-Point Numbers](#floating-point-numbers))
+- `String` (See [Strings](#strings))
+- `Boolean` (See [Booleans](#booleans))
+- `Void`
+
+`Void` is a special type that is **only** allowed as a type for [functions](#functions). Using
+`Void` as a function's return type specifies that there are no return statements in that function.
+
 ## Functions
 ### Function Declaration
-Functions can be declared using the `fn` keyword, followed by an [identifier](#identifiers), then
-parentheses holding parameter names seperated by commas `,`, or just empty parentheses `()` if the
-function takes no parameters, and then braces containing a code block. Note that a function
-declaration does **not** end with a semicolon.
-
+Functions can be declared using the [type](#types), followed by an [identifier](#identifiers), then
+parentheses holding parameter `types` and `names` seperated by commas `,`, or just empty
+parentheses `()` if the function takes no parameters, and then braces containing a code block. Note
+that a function declaration does **not** end with a semicolon.
 ```
-fn square(x) { return x * x; }
+Void hello() { print("Hello"); }
+Integer square(Integer x) { return x * x; }
+Float divide(Float a, Float b) { return a / b; }
 ```
-
-Right now parameters can be any type, and therefore the above function `square()` can be called
-using a [string](#strings) for example `square("Hello")`, although this will result in an
-IllegalOperation error, since the string type does not allow multiplication.
 
 The `return` keyword can **not** be used in the global scope, meaning you can only use it inside
-functions. If the function has no `return`, the return type is `Void`. This type is not allowed to
-be assigned to variables or operated on.
+functions. If the function has no `return`, the return type has to be `Void`. This type is not
+allowed to be assigned to variables or operated on.
 
 *Note that the function cannot use an identifier that's already been used as a variable, no matter
 what type that variable may hold.*
@@ -264,10 +275,10 @@ parentheses `()`, otherwise the arguments for the function can be specified usin
 `expressions` (Identifiers, literals, operations like `5 + x`). Note that the amount of arguments
 **must** match the parameters the function takes **exactly**.
 ```
-fn square(x) { return x * x; }
+Integer square(Integer x) { return x * x; }
 square(5);
 
-let n = 10;
+Integer n = 10;
 square(n);
 ```
 
@@ -277,9 +288,8 @@ outer scope. Trying that will simply result in a [VariableNotFound](#variable-no
 error, as the variable is inaccessible, unless assigned inside the function scope, or a function in
 the parent's scope.
 
-If you have a function within a function, that inner function can still access
-functions from the global scope, as searching the parent environment for functions is recursive
-until it is found.
+If you have a function within a function, that inner function can still access functions from the
+global scope, as searching the parent environment for functions is recursive until it is found.
 
 If your inner function looks for `x`, and `x` is a function in the global or any parent scope, it
 will have access to `x`. However, if we have an inner function, `x` is a function in the global
@@ -296,21 +306,28 @@ execute rust functions in the interpreter.
 The print function would be defined as
 
 ```
-fn print(c) { ... }
+Void print(String c) { ... }
 ```
 
-It executes `print!("{c}")` if `c` is of type [string](#strings), [integer](#integers),
-[float](#floating-point-numbers) or [boolean](#booleans). For any other type it returns a
-[TypeMismatch](#type-mismatch-error) runtime error.
+It executes `print!("{c}")`
 
 #### Builtin `println`
 The println function would be defined as
 
 ```
-fn println(c) { ... }
+Void println(String c) { ... }
 ```
 
 It works the same as the [print](#builtin-print) function, but calls `println!("{c}")` instead.
+
+#### Builtin `*ToString`
+These functions turn other value types into [String](#strings) types so they can be printed. These
+functions would be defined as
+```
+String IntToString(Integer i) { ... }
+String FloatToString(Float f) { ... }
+String BoolToString(Boolean b) { ... }
+```
 
 ## Operators
 ### Operator Precedence
@@ -407,7 +424,7 @@ left type doesn't implement division with numbers.
 well as the operation where this error occurred.
 
 ```
-let x = 5;
+Integer x = 5;
 x = 5.2;
 >> Error: TypeMismatch("Cannot assign value of type 'Float' to variable of type 'Integer'")
 ```
@@ -428,7 +445,7 @@ x = 5.2;
 `identifier`: Holds the name of the missing variable.
 
 ```
-let x = y + 5;
+Integer x = y + 5;
 >> Error: VariableNotFound("y")
 ```
 
@@ -438,7 +455,7 @@ let x = y + 5;
 `identifier`: Holds the name of the uninitialized variable.
 
 ```
-let x;
+Integer x;
 x + 5;
 >> Error: VariableUninitialized("x")
 ```
@@ -449,8 +466,8 @@ x + 5;
 `message`: Holds a message containing why this conflict happened.
 
 ```
-let x = 5;
-fn x(){}
+Integer x = 5;
+Void x(){}
 >> Error: NameConflict("Cannot create function 'x', identifier already exists in current scope")
 ```
 
@@ -460,7 +477,7 @@ fn x(){}
 `count`: The amount of arguments given.
 
 ```
-fn add(a, b) { return a + b; }
+Integer add(a, b) { return a + b; }
 add(5);
 >> Error: IllegalArgumentCount(1)
 ```
@@ -471,4 +488,14 @@ add(5);
 ```
 return 5;
 >> Error: IllegalReturn
+```
+
+### Invalid Type Error
+`InvalidType(identifier)`
+
+`identifier`: Holds the identifier that was used as a type.
+
+```
+some x = 5;
+>> Error: InvalidType("some")
 ```
