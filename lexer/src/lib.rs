@@ -35,6 +35,8 @@ impl Lexer {
             let single: Option<TokenKind> = match current_char {
                 '(' => Some(TokenKind::LeftParen),
                 ')' => Some(TokenKind::RightParen),
+                '{' => Some(TokenKind::LeftBrace),
+                '}' => Some(TokenKind::RightBrace),
                 '+' => Some(TokenKind::Plus),
                 '-' => Some(TokenKind::Minus),
                 '*' => Some(TokenKind::Asterisk),
