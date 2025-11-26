@@ -5,8 +5,8 @@ use std::ops::{Add, Div, Mul, Sub};
 /// Represents the environment mapping variable names to their values.
 #[derive(Debug, Clone, Default)]
 pub struct Scope {
-    /// A mapping of variable names to their corresponding runtime values.
-    pub variables: std::collections::HashMap<String, Option<RuntimeValue>>,
+    /// A mapping of variable names to their corresponding types and values `(Type, Value)`
+    pub variables: std::collections::HashMap<Identifier, (Type, Option<RuntimeValue>)>,
     /// An optional reference to the parent scope for nested scopes.
     pub parent: Option<Box<Scope>>,
 }
@@ -23,7 +23,7 @@ impl Scope {
 
     /// Recursively searches for a variable in parent scopes.
     #[must_use]
-    pub fn find_in_parent(&self, name: &str) -> Option<&Option<RuntimeValue>> {
+    pub fn find_in_parent(&self, name: &str) -> Option<&(Type, Option<RuntimeValue>)> {
         self.parent.as_ref().and_then(|parent| {
             parent
                 .variables
@@ -41,8 +41,32 @@ pub type ExpressionResult = Result<RuntimeValue, RuntimeError>;
 pub type StatementResult = Result<(), RuntimeError>;
 
 // Semantic type aliases
-type Identifier = String;
-type ParamName = String;
+/// Represents an identifier (variable or function name).
+pub type Identifier = String;
+/// Represents a parameter name in function definitions.
+pub type ParamName = String;
+/// Represents a type defined in builtin functions.
+pub type StrType = &'static str;
+
+/// Represents a type in the interpreter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Type(pub String);
+impl Type {
+    /// Creates a new `Type` if the provided type string is valid.
+    /// 
+    /// # Errors
+    /// `InvalidType` if the provided type string is not one of the valid types.
+    pub fn new(type_: &str) -> Result<Self, RuntimeError> {
+        const VALID_TYPES: [&str; 5] =
+            ["Integer", "Float", "String", "Boolean", "Void"];
+
+        if !VALID_TYPES.contains(&type_) {
+            return Err(RuntimeError::InvalidType(type_.to_string()));
+        }
+
+        Ok(Self(type_.to_string()))
+    }
+}
 
 /// Represents runtime errors that can occur during interpretation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +83,7 @@ pub enum RuntimeError {
     ///
     /// # Example
     /// ```ignore
-    /// let x = 5;
+    /// Integer x = 5;
     /// x = 5.2;
     /// ```
     TypeMismatch(String),
@@ -77,7 +101,7 @@ pub enum RuntimeError {
     ///
     /// # Example
     /// ```ignore
-    /// let x = y + 5;
+    /// Integer x = y + 5;
     /// >> "y"
     /// ```
     VariableNotFound(Identifier),
@@ -86,7 +110,7 @@ pub enum RuntimeError {
     ///
     /// # Example
     /// ```ignore
-    /// let x;
+    /// Integer x;
     /// x + 5;
     /// >> "x"
     /// ```
@@ -96,7 +120,7 @@ pub enum RuntimeError {
     ///
     /// # Example
     /// ```ignore
-    /// let x = 5;
+    /// Integer x = 5;
     /// fn x() {}
     /// >> "Cannot create function 'x', identifier already exists in current scope."
     /// ```
@@ -119,6 +143,15 @@ pub enum RuntimeError {
     /// return 5;
     /// ```
     IllegalReturn,
+
+    /// Invalid type error. Holds the identifier of the invalid type.
+    ///
+    /// # Exmaple
+    /// ```ignore
+    /// something x = 5;
+    /// >> "something"
+    /// ```
+    InvalidType(Identifier),
 }
 
 trait Operations {
@@ -143,15 +176,14 @@ pub enum RuntimeValue {
     /// A function value.
     Function {
         /// The parameter names of the function.
-        parameters: Vec<ParamName>,
+        parameters: Vec<(Type, ParamName)>,
         /// The body of the function as a list of statements.
         body: Vec<parser::types::Statement>,
     },
     /// A builtin function value.
     BuiltinFunction {
-        /// The amount of parameters the builtin function takes.
-        /// When types are added, this can be changed to a Vec<Type>
-        parameters: usize,
+        /// The parameter types of the builtin function.
+        parameters: Vec<StrType>,
         /// The implementation of the builtin function.
         implementation: fn(&mut Scope, Vec<RuntimeValue>) -> ExpressionResult,
     },
@@ -168,14 +200,8 @@ impl RuntimeValue {
             Self::Float(_) => "Float",
             Self::String(_) => "String",
             Self::Boolean(_) => "Boolean",
-            Self::Function {
-                parameters: _,
-                body: _,
-            } => "Function",
-            Self::BuiltinFunction {
-                parameters: _,
-                implementation: _,
-            } => "Builtin (Function)",
+            Self::Function { .. } => "Function",
+            Self::BuiltinFunction { .. } => "Builtin (Function)",
             Self::Void => "Void",
         }
     }
@@ -186,14 +212,8 @@ impl RuntimeValue {
             Self::Float(_) => &FloatOperations,
             Self::String(_) => &StringOperations,
             Self::Boolean(_) => &NoOperations { name: "Boolean" },
-            Self::Function {
-                parameters: _,
-                body: _,
-            } => &NoOperations { name: "Function" },
-            Self::BuiltinFunction {
-                parameters: _,
-                implementation: _,
-            } => &NoOperations {
+            Self::Function { .. } => &NoOperations { name: "Function" },
+            Self::BuiltinFunction { .. } => &NoOperations {
                 name: "Builtin (Function)",
             },
             Self::Void => &NoOperations { name: "Void" },
