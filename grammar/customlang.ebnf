@@ -23,7 +23,8 @@ Float = [ Integer ], ".", Integer ;
 String = '"', { Character - ("\" | '"') | EscapeSequence }, '"' ;
 
 Identifier = Letter, { Letter | Digit | "_" } ;
-Type = Identifier ;
+Type = "Integer" | "Float" | "String" | "Boolean" ;
+FunctionType = Type | "Void" ;
 
 Literal = Integer | Float | String ;
 
@@ -42,7 +43,7 @@ Program = { Statement } ;
 VariableDeclaration = Type, __, Identifier, _, "=", _, Expression ;
 VariableAssignment = Identifier, _, "=", _, Expression ;
 
-FunctionDeclaration = Type, __, Identifier, _,
+FunctionDeclaration = FunctionType, __, Identifier, _,
   "(", _, FunctionDeclarationParameters, _, ")",
   "{", _, Program, [ ReturnStatement ], _, "}" ;
 FunctionDeclarationParameters = [
