@@ -1,3 +1,8 @@
+> [!NOTE]
+> Updated last: 25/11/2025 3:49 PM GMT+1
+>
+> Commit: 0b4d227
+
 I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
 These are the currently working language features (for more precise grammar, look at 
 [customlang.ebnf](grammar/customlang.ebnf)):

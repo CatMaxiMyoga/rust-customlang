@@ -5,9 +5,13 @@
 pub enum Keyword {
     /// Let keyword, used for variable declarations.
     Let,
+    /// Fn keyword, used for function definitions.
+    Fn,
+    /// Return keyword, used for returning values from functions.
+    Return,
 }
 
-/// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may 
+/// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
 /// hold associated data relevant to that token type.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
@@ -31,6 +35,12 @@ pub enum TokenKind {
     LeftParen,
     /// )
     RightParen,
+    /// {
+    LeftBrace,
+    /// }
+    RightBrace,
+    /// ,
+    Comma,
     /// =
     Equals,
     /// ;

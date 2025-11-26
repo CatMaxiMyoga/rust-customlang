@@ -42,6 +42,13 @@ pub enum Expression {
         /// The right-hand side expression.
         right: Box<Expression>,
     },
+    /// A function call expression.
+    FunctionCall {
+        /// The name of the function being called.
+        name: String,
+        /// The arguments passed to the function.
+        arguments: Vec<Expression>,
+    }
 }
 
 /// Represents statements in the AST.
@@ -61,6 +68,17 @@ pub enum Statement {
         /// The new value of the variable.
         value: Expression,
     },
+    /// A function declaration statement.
+    FunctionDeclaration {
+        /// The name of the function.
+        name: String,
+        /// The parameters of the function.
+        parameters: Vec<String>,
+        /// The body of the function.
+        body: Vec<Statement>,
+    },
+    /// A return statement.
+    Return(Expression),
     /// An expression statement.
     Expression(Expression),
 }
