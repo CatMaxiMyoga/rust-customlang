@@ -1,52 +1,59 @@
 #![allow(missing_docs)]
 
 use lexer::{Lexer, types::Token};
-use parser::{Parser, types::Program};
+use parser::Parser;
 use interpreter::{Interpreter, types::Environment};
 use std::io::{self, Write};
 
 fn main() {
     let mut environment: Environment = Environment::new();
+    let mut buffer: String = String::new();
 
     loop {
-        print!("\n>> ");
+        if buffer.is_empty() {
+            print!(">>> ");
+        } else {
+            print!("... ");
+        }
+
         let _ = io::stdout().flush();
+
         let mut input: String = String::new();
         if io::stdin().read_line(&mut input).is_err() {
+            eprintln!("Failed to read line.");
             continue;
         }
 
-        input = input[..input.len().saturating_sub(1)].to_string(); // Remove newline
-        let tokens: Result<Vec<Token>, String> = Lexer::tokenize(&input);
+        buffer.push_str(&input);
 
-        match tokens {
-            Ok(toks) => {
-                println!("\nTokens:");
-                for tok in &toks {
-                    println!("{tok:?}");
-                }
+        let tokens: Vec<Token> = match Lexer::tokenize(&buffer) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Lexer error: {e}");
+                buffer.clear();
+                continue;
+            }
+        };
 
-                let ast: Result<Program, String> = Parser::parse(toks);
-
-                match ast {
-                    Ok(program) => {
-                        println!("\nAST:");
-                        for stmt in &program.statements {
-                            println!("{stmt:?}");
-                        }
-
-                        println!("\nInterpreter Output:");
-                        Interpreter::run(program, &mut environment).unwrap_or_else(|e| {
-                            println!("Interpreter error: {e:?}");
-                        });
-                    }
-                    Err(e) => {
-                        println!("Parser error: {e}");
-                    }
-                }
+        match Parser::parse(tokens) {
+            Ok(program) => {
+                Interpreter::run(program, &mut environment).unwrap_or_else(|e| {
+                    eprintln!("Interpreter error: {e:?}");
+                });
+                buffer.clear();
             }
             Err(e) => {
-                println!("Lexer error: {e}");
+                let msg: String = e.to_lowercase();
+
+                if msg.ends_with("end of input")
+                || msg.ends_with("endoffile")
+                || msg.ends_with("'endoffile'")
+                {
+                    continue;
+                }
+
+                eprintln!("Parser error: {e}");
+                buffer.clear();
             }
         }
     }
