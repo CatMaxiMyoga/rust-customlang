@@ -1,6 +1,8 @@
 //! Contains the parser implementation for the programming language.
 pub mod types;
 
+use std::mem::discriminant;
+
 use lexer::types::{Keyword, Token, TokenKind};
 
 use crate::types::{Expression, Literal, Operator, Program, Statement};
@@ -9,6 +11,7 @@ use crate::types::{Expression, Literal, Operator, Program, Statement};
 pub struct Parser {
     tokens: Vec<Token>,
     index: usize,
+    outside_global_scope: bool,
 }
 
 impl Parser {
@@ -17,7 +20,11 @@ impl Parser {
     /// # Errors
     /// Unexpected end of input or invalid syntax.
     pub fn parse(tokens: Vec<Token>) -> Result<Program, String> {
-        let mut parser: Self = Self { tokens, index: 0 };
+        let mut parser: Self = Self {
+            tokens,
+            index: 0,
+            outside_global_scope: false,
+        };
 
         let mut statements: Vec<Statement> = Vec::new();
 
@@ -54,7 +61,7 @@ impl Parser {
 
     fn expect_token(&mut self, kind: &lexer::types::TokenKind) -> Result<&Token, String> {
         if self.match_token(kind) {
-            self.peek()
+            Ok(&self.tokens[self.index - 1])
         } else if let Ok(token) = self.peek() {
             Err(format!(
                 "Expected token '{:?}', found '{:?}'",
@@ -65,27 +72,53 @@ impl Parser {
         }
     }
 
-    fn is_assignment(&self) -> bool {
-        if let Some(token) = self.tokens.get(self.index)
-            && let TokenKind::Identifier(_) = token.kind
-        {
-            return self
-                .tokens
-                .get(self.index + 1)
-                .map_or_else(|| false, |t| t.kind == TokenKind::Equals);
+    fn expect_token_kind(&mut self, kind: &lexer::types::TokenKind) -> Result<&Token, String> {
+        if discriminant(&self.peek()?.kind) == discriminant(kind) {
+            self.advance();
+            Ok(&self.tokens[self.index - 1])
+        } else if let Ok(token) = self.peek() {
+            Err(format!(
+                "Expected token '{:?}', found '{:?}'",
+                kind, token.kind
+            ))
+        } else {
+            Err(format!("Expected token '{kind:?}', found end of input"))
         }
-        false
+    }
+
+    fn check_next_tokens(&self, kinds: &[TokenKind]) -> bool {
+        for (i, kind) in kinds.iter().enumerate() {
+            if let Some(token) = self.tokens.get(self.index + i) {
+                if discriminant(&token.kind) != discriminant(kind) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        true
     }
 
     fn parse_statement(&mut self) -> Result<Statement, String> {
         if self.match_token(&TokenKind::Keyword(Keyword::Let)) {
-            return self.parse_variable_declaration();
-        } else if self.is_assignment() {
-            return self.parse_variable_assignment();
+            self.parse_variable_declaration()
+        } else if self.match_token(&TokenKind::Keyword(Keyword::Fn)) {
+            self.parse_function_declaration()
+        } else if self.match_token(&TokenKind::Keyword(Keyword::Return)) {
+            if !self.outside_global_scope {
+                return Err(String::from("Return statement in global scope"));
+            }
+            let expr: Expression = self.parse_expression()?;
+            self.expect_token(&TokenKind::Semicolon)?;
+            Ok(Statement::Return(expr))
+        } else if self.check_next_tokens(&[TokenKind::Identifier(String::new()), TokenKind::Equals])
+        {
+            self.parse_variable_assignment()
+        } else {
+            let expr: Expression = self.parse_expression()?;
+            self.expect_token(&TokenKind::Semicolon)?;
+            Ok(Statement::Expression(expr))
         }
-        let expr: Expression = self.parse_expression()?;
-        self.expect_token(&TokenKind::Semicolon)?;
-        Ok(Statement::Expression(expr))
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
@@ -110,6 +143,69 @@ impl Parser {
             name: identifier,
             value,
         })
+    }
+
+    fn parse_function_declaration(&mut self) -> Result<Statement, String> {
+        let name: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => {
+                return Err(String::from("Expected identifier after 'fn'"));
+            }
+        };
+        self.advance();
+        self.expect_token(&TokenKind::LeftParen)?;
+
+        let parameters: Vec<String> = self.parse_function_declaration_parameters()?;
+
+        self.expect_token(&TokenKind::LeftBrace)?;
+
+        self.outside_global_scope = true;
+        let mut body: Vec<Statement> = Vec::new();
+        while !self.match_token(&TokenKind::RightBrace) {
+            body.push(self.parse_statement()?);
+        }
+        self.outside_global_scope = false;
+
+        Ok(Statement::FunctionDeclaration {
+            name,
+            parameters,
+            body,
+        })
+    }
+
+    fn parse_function_declaration_parameters(&mut self) -> Result<Vec<String>, String> {
+        let mut parameters: Vec<String> = Vec::new();
+
+        loop {
+            if self.match_token(&TokenKind::RightParen) {
+                break;
+            }
+
+            let identifier: &Token =
+                self.expect_token_kind(&TokenKind::Identifier(String::new()))?;
+            let TokenKind::Identifier(name) = &identifier.kind else {
+                unreachable!("Checked for identifier token before")
+            };
+            parameters.push(name.clone());
+
+            match self.peek()?.kind {
+                TokenKind::Comma => {
+                    self.advance();
+                }
+                TokenKind::RightParen => {
+                    self.advance();
+                    break;
+                }
+                _ => {
+                    return Err(format!(
+                        "Expected ',' or ')', found '{:?}'",
+                        self.peek()?.kind
+                    ));
+                }
+            }
+        }
+
+        Ok(parameters)
     }
 
     fn parse_variable_assignment(&mut self) -> Result<Statement, String> {
@@ -193,6 +289,9 @@ impl Parser {
             }
             TokenKind::Identifier(identifier) => {
                 self.advance();
+                if self.match_token(&TokenKind::LeftParen) {
+                    return self.parse_function_call(&identifier);
+                }
                 Ok(Expression::Identifier(identifier))
             }
             _ => Err(format!("Unexpected token: {:?}", token.kind)),
@@ -220,6 +319,39 @@ impl Parser {
             }
             _ => Err(format!("Expected literal, found {:?}", token.kind)),
         }
+    }
+
+    fn parse_function_call(&mut self, identifier: &str) -> Result<Expression, String> {
+        let mut arguments: Vec<Expression> = Vec::new();
+
+        if !self.match_token(&TokenKind::RightParen) {
+            loop {
+                let value = self.parse_expression()?;
+
+                arguments.push(value);
+
+                match self.peek()?.kind {
+                    TokenKind::Comma => {
+                        self.advance();
+                    }
+                    TokenKind::RightParen => {
+                        self.advance();
+                        break;
+                    }
+                    _ => {
+                        return Err(format!(
+                            "Expected ',' or ')', found '{:?}'",
+                            self.peek()?.kind
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(Expression::FunctionCall {
+            name: identifier.to_string(),
+            arguments,
+        })
     }
 }
 
