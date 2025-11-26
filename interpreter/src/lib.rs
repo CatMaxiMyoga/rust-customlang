@@ -6,11 +6,11 @@ use parser::types::{Expression, Literal, Operator, Program, Statement};
 use std::mem::discriminant;
 use types::{ExpressionResult, RuntimeError, RuntimeValue};
 
-use crate::types::{Environment, StatementResult};
+use crate::types::{Scope, StatementResult};
 
 /// The interpreter for the programming language.
 pub struct Interpreter<'a> {
-    environment: &'a mut Environment,
+    scope: &'a mut Scope,
 }
 
 impl<'a> Interpreter<'a> {
@@ -18,8 +18,8 @@ impl<'a> Interpreter<'a> {
     ///
     /// # Errors
     /// Errors if runtime errors.
-    pub fn run(program: Program, environment: &'a mut Environment) -> Result<(), RuntimeError> {
-        let mut interpreter: Self = Self { environment };
+    pub fn run(program: Program, scope: &'a mut Scope) -> Result<(), RuntimeError> {
+        let mut interpreter: Self = Self { scope };
         interpreter.builtins();
 
         for statement in program.statements {
@@ -30,12 +30,12 @@ impl<'a> Interpreter<'a> {
     }
 
     #[cfg(test)]
-    const fn new(environment: &'a mut Environment) -> Self {
-        Self { environment }
+    const fn new(scope: &'a mut Scope) -> Self {
+        Self { scope }
     }
 
     fn builtins(&mut self) {
-        self.environment.insert(
+        self.scope.variables.insert(
             String::from("print"),
             Some(RuntimeValue::BuiltinFunction {
                 parameters: 1,
@@ -56,7 +56,7 @@ impl<'a> Interpreter<'a> {
             }),
         );
 
-        self.environment.insert(
+        self.scope.variables.insert(
             String::from("println"),
             Some(RuntimeValue::BuiltinFunction {
                 parameters: 1,
@@ -103,7 +103,7 @@ impl<'a> Interpreter<'a> {
         name: &str,
         value: Option<Expression>,
     ) -> StatementResult {
-        if let Some(Some(old_var)) = self.environment.get(name)
+        if let Some(Some(old_var)) = self.scope.variables.get(name)
             && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
         {
             return Err(RuntimeError::IllegalOperation(format!(
@@ -123,16 +123,16 @@ impl<'a> Interpreter<'a> {
             ));
         }
 
-        self.environment.insert(name.to_owned(), value);
+        self.scope.variables.insert(name.to_owned(), value);
 
         Ok(())
     }
 
     fn variable_assignment_statement(&mut self, name: &str, value: Expression) -> StatementResult {
-        let old: Option<RuntimeValue> = if let Some(val) = self.environment.get(name) {
+        let old: Option<RuntimeValue> = if let Some(val) = self.scope.variables.get(name) {
             val.clone()
         } else {
-            return Err(RuntimeError::VaiableNotFound(name.to_owned()));
+            return Err(RuntimeError::VariableNotFound(name.to_owned()));
         };
 
         if let Some(old_var) = old.clone()
@@ -161,7 +161,7 @@ impl<'a> Interpreter<'a> {
             ));
         }
 
-        self.environment.insert(name.to_owned(), Some(value));
+        self.scope.variables.insert(name.to_owned(), Some(value));
 
         Ok(())
     }
@@ -172,14 +172,14 @@ impl<'a> Interpreter<'a> {
         parameters: Vec<String>,
         body: Vec<Statement>,
     ) -> StatementResult {
-        if self.environment.contains_key(name) {
+        if self.scope.variables.contains_key(name) {
             return Err(RuntimeError::NameConflict(format!(
                 "Cannot create function '{name}', identifier already exists in current scope."
             )));
         }
 
         let function: RuntimeValue = RuntimeValue::Function { parameters, body };
-        self.environment.insert(name.to_owned(), Some(function));
+        self.scope.variables.insert(name.to_owned(), Some(function));
 
         Ok(())
     }
@@ -193,13 +193,22 @@ impl<'a> Interpreter<'a> {
                 right,
             } => self.binary_expression(*left, &operator, *right),
             Expression::Identifier(identifier) => {
-                if self.environment.contains_key(&identifier) {
-                    self.environment[&identifier].as_ref().map_or_else(
+                if self.scope.variables.contains_key(&identifier) {
+                    self.scope.variables[&identifier].as_ref().map_or_else(
                         || Err(RuntimeError::VariableUninitialized(identifier)),
                         |value| Ok(value.clone()),
                     )
+                } else if let Some(variable) = &self.scope.find_in_parent(&identifier) {
+                    match variable {
+                        Some(value) => match value {
+                            RuntimeValue::Function { .. }
+                            | RuntimeValue::BuiltinFunction { .. } => Ok(value.clone()),
+                            _ => Err(RuntimeError::VariableNotFound(identifier)),
+                        },
+                        None => Err(RuntimeError::VariableUninitialized(identifier)),
+                    }
                 } else {
-                    Err(RuntimeError::VaiableNotFound(identifier))
+                    Err(RuntimeError::VariableNotFound(identifier))
                 }
             }
             Expression::FunctionCall { name, arguments } => {
@@ -239,19 +248,45 @@ impl<'a> Interpreter<'a> {
         name: &str,
         arguments: Vec<Expression>,
     ) -> ExpressionResult {
-        if !self.environment.contains_key(name) {
-            return Err(RuntimeError::VaiableNotFound(name.to_owned()));
+        if !self.scope.variables.contains_key(name) {
+            if let Some(Some(func)) = self.scope.find_in_parent(name) {
+                match func {
+                    RuntimeValue::BuiltinFunction { .. } => {
+                        return self.builtin_function_call_expression(name, arguments);
+                    }
+                    RuntimeValue::Function { .. } => {}
+                    _ => {
+                        return Err(RuntimeError::VariableNotFound(name.to_owned()));
+                    }
+                }
+            } else {
+                return Err(RuntimeError::VariableNotFound(name.to_owned()));
+            }
         }
 
-        let (parameters, body): (Vec<String>, Vec<Statement>) = match self.environment.get(name) {
+        let function: (Vec<String>, Vec<Statement>) = match self.scope.variables.get(name) {
             Some(Some(RuntimeValue::Function { parameters, body })) => {
                 (parameters.clone(), body.clone())
             }
-            Some(Some(RuntimeValue::BuiltinFunction {
-                parameters: _,
-                implementation: _,
-            })) => {
+            Some(Some(RuntimeValue::BuiltinFunction { .. })) => {
                 return self.builtin_function_call_expression(name, arguments);
+            }
+            None => {
+                if let Some(Some(func)) = self.scope.find_in_parent(name) {
+                    match func {
+                        RuntimeValue::BuiltinFunction { .. } => {
+                            return self.builtin_function_call_expression(name, arguments);
+                        }
+                        RuntimeValue::Function { parameters, body } => {
+                            (parameters.clone(), body.clone())
+                        }
+                        _ => {
+                            return Err(RuntimeError::VariableNotFound(name.to_owned()));
+                        }
+                    }
+                } else {
+                    return Err(RuntimeError::VariableNotFound(name.to_owned()));
+                }
             }
             _ => {
                 return Err(RuntimeError::TypeMismatch(format!(
@@ -260,26 +295,23 @@ impl<'a> Interpreter<'a> {
             }
         };
 
-        let mut environment: Environment = Environment::new();
+        let mut scope: Scope = Scope::with_parent(self.scope.clone());
 
-        for (key, value) in self.environment.iter() {
-            environment.insert(key.clone(), value.clone());
-        }
+        let mut interpreter: Interpreter = Interpreter { scope: &mut scope };
 
-        let mut interpreter: Interpreter = Interpreter {
-            environment: &mut environment,
-        };
-
-        if arguments.len() != parameters.len() {
+        if arguments.len() != function.0.len() {
             return Err(RuntimeError::IllegalArgumentCount(arguments.len()));
         }
 
-        for (i, parameter) in parameters.iter().enumerate() {
+        for (i, parameter) in function.0.iter().enumerate() {
             let argument_value: RuntimeValue = self.expression(arguments[i].clone())?;
-            interpreter.environment.insert(parameter.clone(), Some(argument_value));
+            interpreter
+                .scope
+                .variables
+                .insert(parameter.clone(), Some(argument_value));
         }
 
-        for statement in body.iter().cloned() {
+        for statement in function.1.iter().cloned() {
             if let Statement::Return(value) = statement {
                 return interpreter.expression(value);
             }
@@ -294,10 +326,10 @@ impl<'a> Interpreter<'a> {
         name: &str,
         arguments: Vec<Expression>,
     ) -> ExpressionResult {
-        type BuiltinFunctionImpl = fn(&mut Environment, Vec<RuntimeValue>) -> ExpressionResult;
+        type BuiltinFunctionImpl = fn(&mut Scope, Vec<RuntimeValue>) -> ExpressionResult;
         type BuiltinFunction = (usize, BuiltinFunctionImpl);
 
-        let builtin: BuiltinFunction = match self.environment.get(name) {
+        let builtin: BuiltinFunction = match self.scope.variables.get(name) {
             Some(Some(RuntimeValue::BuiltinFunction {
                 parameters,
                 implementation,
@@ -317,7 +349,7 @@ impl<'a> Interpreter<'a> {
             args.push(self.expression(argument)?);
         }
 
-        builtin.1(self.environment, args)
+        builtin.1(self.scope, args)
     }
 }
 
@@ -331,8 +363,8 @@ mod tests {
             paste::paste! {
                 #[test]
                 fn [<$name _ $suffix>]() {
-                    let mut environment: Environment = Environment::new();
-                    let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+                    let mut scope: Scope = Scope::default();
+                    let mut interpreter: Interpreter = Interpreter::new(&mut scope);
                     let expression: Expression = Expression::Binary{
                         left: Box::new($left),
                         operator: Operator::$op,
@@ -393,21 +425,21 @@ mod tests {
 
     #[test]
     fn variable_declaration() {
-        let mut environment: Environment = Environment::new();
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
         let declaration: Statement = Statement::VariableDeclaration {
             name: String::from("x"),
             value: None,
         };
         interpreter.statement(declaration).unwrap();
-        assert!(environment.contains_key("x"));
-        assert!(environment["x"].is_none());
+        assert!(scope.variables.contains_key("x"));
+        assert!(scope.variables["x"].is_none());
     }
 
     #[test]
     fn variable_initialization() {
-        let mut environment: Environment = Environment::new();
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let declaration: Statement = Statement::VariableDeclaration {
             name: String::from("x"),
@@ -415,15 +447,15 @@ mod tests {
         };
         interpreter.statement(declaration).unwrap();
 
-        assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(RuntimeValue::Integer(10)));
+        assert!(scope.variables.contains_key("x"));
+        assert_eq!(scope.variables["x"], Some(RuntimeValue::Integer(10)));
     }
 
     #[test]
     fn variable_delayed_initialization() {
-        let mut environment: Environment = Environment::new();
-        environment.insert(String::from("x"), None);
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        scope.variables.insert(String::from("x"), None);
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {
             name: String::from("x"),
@@ -431,15 +463,17 @@ mod tests {
         };
         interpreter.statement(assignment).unwrap();
 
-        assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(RuntimeValue::Float(20.0)));
+        assert!(scope.variables.contains_key("x"));
+        assert_eq!(scope.variables["x"], Some(RuntimeValue::Float(20.0)));
     }
 
     #[test]
     fn variable_reassignment() {
-        let mut environment: Environment = Environment::new();
-        environment.insert(String::from("x"), Some(RuntimeValue::Integer(10)));
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        scope
+            .variables
+            .insert(String::from("x"), Some(RuntimeValue::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {
             name: String::from("x"),
@@ -447,15 +481,17 @@ mod tests {
         };
         interpreter.statement(assignment).unwrap();
 
-        assert!(environment.contains_key("x"));
-        assert_eq!(environment["x"], Some(RuntimeValue::Integer(30)));
+        assert!(scope.variables.contains_key("x"));
+        assert_eq!(scope.variables["x"], Some(RuntimeValue::Integer(30)));
     }
 
     #[test]
     fn variable_type_mismatch() {
-        let mut environment: Environment = Environment::new();
-        environment.insert(String::from("x"), Some(RuntimeValue::Integer(10)));
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        scope
+            .variables
+            .insert(String::from("x"), Some(RuntimeValue::Integer(10)));
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let assignment: Statement = Statement::VariableAssignment {
             name: String::from("x"),
@@ -474,8 +510,8 @@ mod tests {
 
     #[test]
     fn string_arithmetic() {
-        let mut environment: Environment = Environment::new();
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
 
         let expression: Expression = Expression::Binary {
             left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
@@ -495,8 +531,8 @@ mod tests {
 
     #[test]
     fn string_concatenation() {
-        let mut environment: Environment = Environment::new();
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
         let expression: Expression = Expression::Binary {
             left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
             operator: Operator::Add,
@@ -508,8 +544,8 @@ mod tests {
 
     #[test]
     fn boolean_literal() {
-        let mut environment: Environment = Environment::new();
-        let mut interpreter: Interpreter = Interpreter::new(&mut environment);
+        let mut scope: Scope = Scope::default();
+        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
         let expression: Expression = Expression::Literal(Literal::Boolean(true));
         let result: RuntimeValue = interpreter.expression(expression).unwrap();
         assert_eq!(result, RuntimeValue::Boolean(true));

@@ -2,11 +2,11 @@
 
 use lexer::{Lexer, types::Token};
 use parser::Parser;
-use interpreter::{Interpreter, types::Environment};
+use interpreter::{Interpreter, types::Scope};
 use std::io::{self, Write};
 
 fn main() {
-    let mut environment: Environment = Environment::new();
+    let mut environment: Scope = Scope::default();
     let mut buffer: String = String::new();
 
     loop {

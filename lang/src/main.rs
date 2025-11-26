@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use interpreter::{Interpreter, types::{Environment, RuntimeError}};
+use interpreter::{Interpreter, types::{Scope, RuntimeError}};
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
 
@@ -56,7 +56,7 @@ fn main() {
         },
     };
 
-    let mut environment: Environment = Environment::new();
+    let mut environment: Scope = Scope::default();
 
     let runtime_result: Result<(), RuntimeError> = Interpreter::run(program, &mut environment);
     if let Err(e) = runtime_result {

@@ -1,10 +1,6 @@
-let x = 5;
-let y = 10.0;
-let z = "Hello, World!";
-let a = true;
-
-x; y; z; a;
-
-y = x * y;
-
-y;
+fn x(y) { return y * y; }
+let y = 2;
+fn a(b) { return x(b) + x(b); }
+println(a(y));
+fn b(c) { return y + c; }
+println(b(5));
