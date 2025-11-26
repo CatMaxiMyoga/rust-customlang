@@ -482,11 +482,11 @@ mod lexer_tests {
         let result: Vec<Token> = Lexer::tokenize("Integer x = 10;").unwrap();
         let expected: Vec<Token> = vec![
             Token::new(TokenKind::Identifier(String::from("Integer")), 1, 1),
-            Token::new(TokenKind::Identifier(String::from("x")), 1, 5),
-            Token::new(TokenKind::Equals, 1, 7),
-            Token::new(TokenKind::Integer(10), 1, 9),
-            Token::new(TokenKind::Semicolon, 1, 11),
-            Token::new(TokenKind::EndOfFile, 1, 12),
+            Token::new(TokenKind::Identifier(String::from("x")), 1, 9),
+            Token::new(TokenKind::Equals, 1, 11),
+            Token::new(TokenKind::Integer(10), 1, 13),
+            Token::new(TokenKind::Semicolon, 1, 15),
+            Token::new(TokenKind::EndOfFile, 1, 16),
         ];
         assert_eq!(result, expected);
     }
