@@ -3,7 +3,36 @@
 use std::ops::{Add, Div, Mul, Sub};
 
 /// Represents the environment mapping variable names to their values.
-pub type Environment = std::collections::HashMap<String, Option<RuntimeValue>>;
+#[derive(Debug, Clone, Default)]
+pub struct Scope {
+    /// A mapping of variable names to their corresponding runtime values.
+    pub variables: std::collections::HashMap<String, Option<RuntimeValue>>,
+    /// An optional reference to the parent scope for nested scopes.
+    pub parent: Option<Box<Scope>>,
+}
+
+impl Scope {
+    /// Creates a new scope with a reference to a parent scope.
+    #[must_use]
+    pub fn with_parent(parent: Self) -> Self {
+        Self {
+            variables: std::collections::HashMap::new(),
+            parent: Some(Box::new(parent)),
+        }
+    }
+
+    /// Recursively searches for a variable in parent scopes.
+    #[must_use]
+    pub fn find_in_parent(&self, name: &str) -> Option<&Option<RuntimeValue>> {
+        self.parent.as_ref().and_then(|parent| {
+            parent
+                .variables
+                .get(name)
+                .map_or_else(|| parent.find_in_parent(name), Some)
+        })
+    }
+}
+
 
 /// Represents the result of a runtime operation returning a value
 pub type ExpressionResult = Result<RuntimeValue, RuntimeError>;
@@ -51,7 +80,7 @@ pub enum RuntimeError {
     /// let x = y + 5;
     /// >> "y"
     /// ```
-    VaiableNotFound(Identifier),
+    VariableNotFound(Identifier),
 
     /// Variable uninitialized error. Holds the name of the uninitialized variable.
     ///
@@ -124,7 +153,7 @@ pub enum RuntimeValue {
         /// When types are added, this can be changed to a Vec<Type>
         parameters: usize,
         /// The implementation of the builtin function.
-        implementation: fn(&mut Environment, Vec<RuntimeValue>) -> ExpressionResult,
+        implementation: fn(&mut Scope, Vec<RuntimeValue>) -> ExpressionResult,
     },
     /// Represents no value (void).
     Void,
@@ -164,7 +193,9 @@ impl RuntimeValue {
             Self::BuiltinFunction {
                 parameters: _,
                 implementation: _,
-            } => &NoOperations { name: "Builtin (Function)" },
+            } => &NoOperations {
+                name: "Builtin (Function)",
+            },
             Self::Void => &NoOperations { name: "Void" },
         }
     }

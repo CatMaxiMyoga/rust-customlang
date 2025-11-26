@@ -1,7 +1,5 @@
 > [!NOTE]
-> Updated last: 25/11/2025 3:49 PM GMT+1
->
-> Commit: 0b4d227
+> Updated last: 25/11/2025
 
 I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
 These are the currently working language features (for more precise grammar, look at 
@@ -272,6 +270,23 @@ square(5);
 let n = 10;
 square(n);
 ```
+
+When a function is called, it gets its own scope. The function's inner code block has access to
+functions from the parent scope, but it is not allowed to access non-function variables from the
+outer scope. Trying that will simply result in a [VariableNotFound](#variable-not-found-error)
+error, as the variable is inaccessible, unless assigned inside the function scope, or a function in
+the parent's scope.
+
+If you have a function within a function, that inner function can still access
+functions from the global scope, as searching the parent environment for functions is recursive
+until it is found.
+
+If your inner function looks for `x`, and `x` is a function in the global or any parent scope, it
+will have access to `x`. However, if we have an inner function, `x` is a function in the global
+scope, but the outer function overwrites `x` as a non-function variable, `x` will be found inside
+the outer function's scope and the search will stop and return a
+[VariableNotFound](#variable-not-found-error) error, since the `x` that was found is not a
+function.
 
 ### Builtin Functions
 Builtin functions are functions that the interpreter adds to the environment by default. They
