@@ -4,9 +4,9 @@ pub mod types;
 
 use parser::types::{Expression, Literal, Operator, Program, Statement};
 use std::mem::discriminant;
-use types::{RuntimeError, RuntimeResult, RuntimeValue};
+use types::{ExpressionResult, RuntimeError, RuntimeValue};
 
-use crate::types::Environment;
+use crate::types::{Environment, StatementResult};
 
 /// The interpreter for the programming language.
 pub struct Interpreter<'a> {
@@ -20,6 +20,8 @@ impl<'a> Interpreter<'a> {
     /// Errors if runtime errors.
     pub fn run(program: Program, environment: &'a mut Environment) -> Result<(), RuntimeError> {
         let mut interpreter: Self = Self { environment };
+        interpreter.builtins();
+
         for statement in program.statements {
             interpreter.statement(statement)?;
         }
@@ -32,48 +34,157 @@ impl<'a> Interpreter<'a> {
         Self { environment }
     }
 
+    fn builtins(&mut self) {
+        self.environment.insert(
+            String::from("print"),
+            Some(RuntimeValue::BuiltinFunction {
+                parameters: 1,
+                implementation: |_, args| {
+                    match &args[0] {
+                        RuntimeValue::String(c) => print!("{c}"),
+                        RuntimeValue::Integer(c) => print!("{c}"),
+                        RuntimeValue::Float(c) => print!("{c}"),
+                        RuntimeValue::Boolean(c) => print!("{c}"),
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch(
+                                "Unsupported type for print function".to_owned(),
+                            ));
+                        }
+                    }
+                    Ok(RuntimeValue::Void)
+                },
+            }),
+        );
+
+        self.environment.insert(
+            String::from("println"),
+            Some(RuntimeValue::BuiltinFunction {
+                parameters: 1,
+                implementation: |_, args| {
+                    match &args[0] {
+                        RuntimeValue::String(c) => println!("{c}"),
+                        RuntimeValue::Integer(c) => println!("{c}"),
+                        RuntimeValue::Float(c) => println!("{c}"),
+                        RuntimeValue::Boolean(c) => println!("{c}"),
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch(
+                                "Unsupported type for println function".to_owned(),
+                            ));
+                        }
+                    }
+                    Ok(RuntimeValue::Void)
+                },
+            }),
+        );
+    }
+
     fn statement(&mut self, statement: Statement) -> Result<(), RuntimeError> {
         match statement {
-            Statement::Expression(expr) => {
-                // TEMP: prints the result of expression statements
-                let expression_result: RuntimeValue = self.expression(expr)?;
-                println!("{expression_result:?}");
-            }
+            Statement::Expression(expr) => _ = self.expression(expr)?,
             Statement::VariableDeclaration { name, value } => {
-                let value: Option<RuntimeValue> = if let Some(expr) = value {
-                    Some(self.expression(expr)?)
-                } else {
-                    None
-                };
-                self.environment.insert(name, value);
+                self.variable_declaration_statement(&name, value)?;
             }
             Statement::VariableAssignment { name, value } => {
-                let old: Option<RuntimeValue> = if let Some(val) = self.environment.get(&name) {
-                    val.clone()
-                } else {
-                    return Err(RuntimeError::VaiableNotFound(name));
-                };
-
-                let value: RuntimeValue = self.expression(value)?;
-
-                if let Some(old) = old
-                    && discriminant(&old) != discriminant(&value)
-                {
-                    let old_name: &'static str = old.get_name();
-                    let value_name: &'static str = value.get_name();
-                    return Err(RuntimeError::TypeMismatch(format!(
-                        "Cannot assign value of type '{value_name}' to variable of type '{old_name}'"
-                    )));
-                }
-
-                self.environment.insert(name, Some(value));
+                self.variable_assignment_statement(&name, value)?;
             }
+            Statement::FunctionDeclaration {
+                name,
+                parameters,
+                body,
+            } => self.function_declaration_statement(&name, parameters, body)?,
+            Statement::Return(_) => return Err(RuntimeError::IllegalReturn),
         }
 
         Ok(())
     }
 
-    fn expression(&mut self, expression: Expression) -> RuntimeResult {
+    fn variable_declaration_statement(
+        &mut self,
+        name: &str,
+        value: Option<Expression>,
+    ) -> StatementResult {
+        if let Some(Some(old_var)) = self.environment.get(name)
+            && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
+        {
+            return Err(RuntimeError::IllegalOperation(format!(
+                "Cannot declare variable '{name}' with same name as function"
+            )));
+        }
+
+        let value: Option<RuntimeValue> = if let Some(expr) = value {
+            Some(self.expression(expr)?)
+        } else {
+            None
+        };
+
+        if value == Some(RuntimeValue::Void) {
+            return Err(RuntimeError::TypeMismatch(
+                "Cannot assign 'Void' type to variable.".to_owned(),
+            ));
+        }
+
+        self.environment.insert(name.to_owned(), value);
+
+        Ok(())
+    }
+
+    fn variable_assignment_statement(&mut self, name: &str, value: Expression) -> StatementResult {
+        let old: Option<RuntimeValue> = if let Some(val) = self.environment.get(name) {
+            val.clone()
+        } else {
+            return Err(RuntimeError::VaiableNotFound(name.to_owned()));
+        };
+
+        if let Some(old_var) = old.clone()
+            && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
+        {
+            return Err(RuntimeError::TypeMismatch(format!(
+                "Cannot assign value to function variable '{name}'"
+            )));
+        }
+
+        let value: RuntimeValue = self.expression(value)?;
+
+        if let Some(old) = old
+            && discriminant(&old) != discriminant(&value)
+        {
+            let old_name: &'static str = old.get_name();
+            let value_name: &'static str = value.get_name();
+            return Err(RuntimeError::TypeMismatch(format!(
+                "Cannot assign value of type '{value_name}' to variable of type '{old_name}'"
+            )));
+        }
+
+        if value == RuntimeValue::Void {
+            return Err(RuntimeError::TypeMismatch(
+                "Cannot assign 'Void' type to variable.".to_owned(),
+            ));
+        }
+
+        self.environment.insert(name.to_owned(), Some(value));
+
+        Ok(())
+    }
+
+    fn function_declaration_statement(
+        &mut self,
+        name: &str,
+        parameters: Vec<String>,
+        body: Vec<Statement>,
+    ) -> StatementResult {
+        if self.environment.contains_key(name) {
+            return Err(RuntimeError::NameConflict(format!(
+                "Cannot create function '{name}', identifier already exists in current scope."
+            )));
+        }
+
+        let function: RuntimeValue = RuntimeValue::Function { parameters, body };
+        self.environment.insert(name.to_owned(), Some(function));
+
+        Ok(())
+    }
+
+    fn expression(&mut self, expression: Expression) -> ExpressionResult {
         match expression {
             Expression::Literal(literal) => Ok(Self::literal_expression(&literal)),
             Expression::Binary {
@@ -90,6 +201,9 @@ impl<'a> Interpreter<'a> {
                 } else {
                     Err(RuntimeError::VaiableNotFound(identifier))
                 }
+            }
+            Expression::FunctionCall { name, arguments } => {
+                self.function_call_expression(&name, arguments)
             }
         }
     }
@@ -108,7 +222,7 @@ impl<'a> Interpreter<'a> {
         left: Expression,
         operator: &Operator,
         right: Expression,
-    ) -> RuntimeResult {
+    ) -> ExpressionResult {
         let left: RuntimeValue = self.expression(left)?;
         let right: RuntimeValue = self.expression(right)?;
 
@@ -118,6 +232,92 @@ impl<'a> Interpreter<'a> {
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
         }
+    }
+
+    fn function_call_expression(
+        &mut self,
+        name: &str,
+        arguments: Vec<Expression>,
+    ) -> ExpressionResult {
+        if !self.environment.contains_key(name) {
+            return Err(RuntimeError::VaiableNotFound(name.to_owned()));
+        }
+
+        let (parameters, body): (Vec<String>, Vec<Statement>) = match self.environment.get(name) {
+            Some(Some(RuntimeValue::Function { parameters, body })) => {
+                (parameters.clone(), body.clone())
+            }
+            Some(Some(RuntimeValue::BuiltinFunction {
+                parameters: _,
+                implementation: _,
+            })) => {
+                return self.builtin_function_call_expression(name, arguments);
+            }
+            _ => {
+                return Err(RuntimeError::TypeMismatch(format!(
+                    "Tried to call non-function variable '{name}'"
+                )));
+            }
+        };
+
+        let mut environment: Environment = Environment::new();
+
+        for (key, value) in self.environment.iter() {
+            environment.insert(key.clone(), value.clone());
+        }
+
+        let mut interpreter: Interpreter = Interpreter {
+            environment: &mut environment,
+        };
+
+        if arguments.len() != parameters.len() {
+            return Err(RuntimeError::IllegalArgumentCount(arguments.len()));
+        }
+
+        for (i, parameter) in parameters.iter().enumerate() {
+            let argument_value: RuntimeValue = self.expression(arguments[i].clone())?;
+            interpreter.environment.insert(parameter.clone(), Some(argument_value));
+        }
+
+        for statement in body.iter().cloned() {
+            if let Statement::Return(value) = statement {
+                return interpreter.expression(value);
+            }
+            interpreter.statement(statement)?;
+        }
+
+        Ok(RuntimeValue::Void)
+    }
+
+    fn builtin_function_call_expression(
+        &mut self,
+        name: &str,
+        arguments: Vec<Expression>,
+    ) -> ExpressionResult {
+        type BuiltinFunctionImpl = fn(&mut Environment, Vec<RuntimeValue>) -> ExpressionResult;
+        type BuiltinFunction = (usize, BuiltinFunctionImpl);
+
+        let builtin: BuiltinFunction = match self.environment.get(name) {
+            Some(Some(RuntimeValue::BuiltinFunction {
+                parameters,
+                implementation,
+            })) => (*parameters, *implementation),
+            _ => {
+                unreachable!()
+            }
+        };
+
+        if arguments.len() != builtin.0 {
+            return Err(RuntimeError::IllegalArgumentCount(arguments.len()));
+        }
+
+        let mut args: Vec<RuntimeValue> = Vec::new();
+
+        for argument in arguments {
+            args.push(self.expression(argument)?);
+        }
+
+        builtin.1(self.environment, args)
     }
 }
 
@@ -264,9 +464,12 @@ mod tests {
         let result: Result<(), RuntimeError> = interpreter.statement(assignment);
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), RuntimeError::TypeMismatch(
-            String::from("Cannot assign value of type 'Float' to variable of type 'Integer'")
-        ));
+        assert_eq!(
+            result.unwrap_err(),
+            RuntimeError::TypeMismatch(String::from(
+                "Cannot assign value of type 'Float' to variable of type 'Integer'"
+            ))
+        );
     }
 
     #[test]
@@ -279,7 +482,7 @@ mod tests {
             operator: Operator::Multiply,
             right: Box::new(Expression::Literal(Literal::Integer(5))),
         };
-        let result: RuntimeResult = interpreter.expression(expression);
+        let result: ExpressionResult = interpreter.expression(expression);
 
         assert!(result.is_err());
         assert_eq!(
