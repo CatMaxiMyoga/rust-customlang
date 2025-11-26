@@ -167,8 +167,6 @@ impl Lexer {
         if !identifier_vec.is_empty() {
             let identifier_str: String = identifier_vec.iter().collect();
             let kind: TokenKind = match identifier_str.as_str() {
-                "let" => TokenKind::Keyword(Keyword::Let),
-                "fn" => TokenKind::Keyword(Keyword::Fn),
                 "return" => TokenKind::Keyword(Keyword::Return),
                 "true" => TokenKind::Boolean(true),
                 "false" => TokenKind::Boolean(false),
@@ -480,20 +478,10 @@ mod lexer_tests {
     }
 
     #[test]
-    fn keyword_let() {
-        let result: Vec<Token> = Lexer::tokenize("let").unwrap();
-        let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Keyword(Keyword::Let), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 4),
-        ];
-        assert_eq!(result, expected);
-    }
-
-    #[test]
     fn variable_assignment() {
-        let result: Vec<Token> = Lexer::tokenize("let x = 10;").unwrap();
+        let result: Vec<Token> = Lexer::tokenize("Integer x = 10;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Keyword(Keyword::Let), 1, 1),
+            Token::new(TokenKind::Identifier(String::from("Integer")), 1, 1),
             Token::new(TokenKind::Identifier(String::from("x")), 1, 5),
             Token::new(TokenKind::Equals, 1, 7),
             Token::new(TokenKind::Integer(10), 1, 9),
