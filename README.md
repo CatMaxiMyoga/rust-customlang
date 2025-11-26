@@ -284,7 +284,7 @@ The print function would be defined as
 fn print(c) { ... }
 ```
 
-It executes the `print!("{c}")` macro if `c` is of type [string](#strings), [integer](#integers),
+It executes `print!("{c}")` if `c` is of type [string](#strings), [integer](#integers),
 [float](#floating-point-numbers) or [boolean](#booleans). For any other type it returns a
 [TypeMismatch](#type-mismatch-error) runtime error.
 
