@@ -20,18 +20,27 @@ These are the currently working language features (for more precise grammar, loo
         - [Delayed Variable Initialization](#delayed-variable-initialization)
         - [Variable Reassignment](#variable-reassignment)
         - [Variable Shadowing](#variable-shadowing)
+    - [Functions](#functions)
+        - [Function Declaration](#function-declaration)
+        - [Function Call](#function-call)
+        - [Builtin Functions](#builtin-functions)
+            - [`print(c)`](#builtin-print)
+            - [`println(c)`](#builtin-println)
     - [Operators](#operators)
         - [Operator Precedence](#operator-precedence)
-        - [Add](#add-)
-        - [Subtract](#subtract--)
-        - [Multiply](#multiply-)
-        - [Divide](#divide-)
+        - [Add `+`](#add-)
+        - [Subtract `-`](#subtract--)
+        - [Multiply `*`](#multiply-)
+        - [Divide `/`](#divide-)
     - [Errors](#errors)
-        - [Division By Zero Error](#division-by-zero-error)
-        - [Type Mismatch Error](#type-mismatch-error)
-        - [Illegal Operation Error](#illegal-operation-error)
-        - [Variable Not Found Error](#variable-not-found-error)
-        - [Variable Uninitialized Error](#variable-uninitialized-error)
+        - [DivisionByZero](#division-by-zero-error)
+        - [TypeMismatch](#type-mismatch-error)
+        - [IllegalOperation](#illegal-operation-error)
+        - [VariableNotFound](#variable-not-found-error)
+        - [VariableUninitialized](#variable-uninitialized-error)
+        - [NameConflict](#name-conflict-error)
+        - [IllegalArgumentCount](#illegal-argument-count-error)
+        - [IllegalReturn](#illegal-return-error)
 
 # Language Features
 
@@ -190,6 +199,9 @@ After the variable has been initialized (whether delayed or immediate), it holds
 result of the expression following the `=`, which, in the case of a literal, is just the type of
 the literal.
 
+*Identifiers holding functions **cannot** be used as variable names, as function variables are not
+allowed to be overwritten!*
+
 ### Variable Reassignment
 Also called variable updating. To reassign a variable to a new value, simply use the variable's
 identifier without the `let` keyword before it.
@@ -207,6 +219,9 @@ x = "Hello";
 >> Error: TypeMismatch
 ```
 
+*Identifiers holding functions **cannot** be reassigned, as function variables are not allowed to
+be overwritten!*
+
 ### Variable Shadowing
 Also called variable redeclaration. It basically deletes the old variable and overwrites it with
 the new one, meaning the variable doesn't hold a type anymore either, letting you choose a new type
@@ -218,6 +233,69 @@ let x = "Hello";
 
 Note that the old variable will not exist anymore, meaning in the above example `5` is lost
 forever.
+
+*Identifiers holding functions **cannot** be used as variable names, as function variables are not
+allowed to be overwritten!*
+
+## Functions
+### Function Declaration
+Functions can be declared using the `fn` keyword, followed by an [identifier](#identifiers), then
+parentheses holding parameter names seperated by commas `,`, or just empty parentheses `()` if the
+function takes no parameters, and then braces containing a code block. Note that a function
+declaration does **not** end with a semicolon.
+
+```
+fn square(x) { return x * x; }
+```
+
+Right now parameters can be any type, and therefore the above function `square()` can be called
+using a [string](#strings) for example `square("Hello")`, although this will result in an
+IllegalOperation error, since the string type does not allow multiplication.
+
+The `return` keyword can **not** be used in the global scope, meaning you can only use it inside
+functions. If the function has no `return`, the return type is `Void`. This type is not allowed to
+be assigned to variables or operated on.
+
+*Note that the function cannot use an identifier that's already been used as a variable, no matter
+what type that variable may hold.*
+
+### Function Call
+Calling functions is done by specifying the [identifier](#identifiers) holding the function and
+putting parentheses behind it. If the function takes no arguments, you can just use empty
+parentheses `()`, otherwise the arguments for the function can be specified using comma-seperated
+`expressions` (Identifiers, literals, operations like `5 + x`). Note that the amount of arguments
+**must** match the parameters the function takes **exactly**.
+```
+fn square(x) { return x * x; }
+square(5);
+
+let n = 10;
+square(n);
+```
+
+### Builtin Functions
+Builtin functions are functions that the interpreter adds to the environment by default. They
+execute rust functions in the interpreter.
+
+#### Builtin `print`
+The print function would be defined as
+
+```
+fn print(c) { ... }
+```
+
+It executes `print!("{c}")` if `c` is of type [string](#strings), [integer](#integers),
+[float](#floating-point-numbers) or [boolean](#booleans). For any other type it returns a
+[TypeMismatch](#type-mismatch-error) runtime error.
+
+#### Builtin `println`
+The println function would be defined as
+
+```
+fn println(c) { ... }
+```
+
+It works the same as the [print](#builtin-print) function, but calls `println!("{c}")` instead.
 
 ## Operators
 ### Operator Precedence
@@ -348,4 +426,34 @@ let x = y + 5;
 let x;
 x + 5;
 >> Error: VariableUninitialized("x")
+```
+
+### Name Conflict Error
+`NameConflict(message)`
+
+`message`: Holds a message containing why this conflict happened.
+
+```
+let x = 5;
+fn x(){}
+>> Error: NameConflict("Cannot create function 'x', identifier already exists in current scope")
+```
+
+### Illegal Argument Count Error
+`IllegalArgumentCount(count)`
+
+`count`: The amount of arguments given.
+
+```
+fn add(a, b) { return a + b; }
+add(5);
+>> Error: IllegalArgumentCount(1)
+```
+
+### Illegal Return Error
+`IllegalReturn`
+
+```
+return 5;
+>> Error: IllegalReturn
 ```

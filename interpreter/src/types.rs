@@ -73,7 +73,7 @@ pub enum RuntimeError {
     /// ```
     NameConflict(String),
 
-    /// Illegal argument error. Holds the amount of expected arguments.
+    /// Illegal argument error. Holds the amount of given arguments.
     ///
     /// # Example
     /// ```ignore
