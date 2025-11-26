@@ -25,7 +25,7 @@ These are the currently working language features (for more precise grammar, loo
         - [Function Call](#function-call)
         - [Builtin Functions](#builtin-functions)
             - [`print(c)`](#builtin-print)
-            - [`println(c)`](#builtin-prinln)
+            - [`println(c)`](#builtin-println)
     - [Operators](#operators)
         - [Operator Precedence](#operator-precedence)
         - [Add `+`](#add-)
