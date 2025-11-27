@@ -33,7 +33,6 @@ impl Scope {
     }
 }
 
-
 /// Represents the result of a runtime operation returning a value
 pub type ExpressionResult = Result<RuntimeValue, RuntimeError>;
 
@@ -53,12 +52,11 @@ pub type StrType = &'static str;
 pub struct Type(pub String);
 impl Type {
     /// Creates a new `Type` if the provided type string is valid.
-    /// 
+    ///
     /// # Errors
     /// `InvalidType` if the provided type string is not one of the valid types.
     pub fn new(type_: &str) -> Result<Self, RuntimeError> {
-        const VALID_TYPES: [&str; 5] =
-            ["Integer", "Float", "String", "Boolean", "Void"];
+        const VALID_TYPES: [&str; 5] = ["Integer", "Float", "String", "Boolean", "Void"];
 
         if !VALID_TYPES.contains(&type_) {
             return Err(RuntimeError::InvalidType(type_.to_string()));
@@ -377,7 +375,7 @@ impl Operations for IntegerOperations {
         match rhs {
             RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
             _ => Err(RuntimeError::IllegalOperation(
-            "Cannot compare Integer with non-Integer type".to_string(),
+                "Cannot compare Integer with non-Integer type".to_string(),
             )),
         }
     }
@@ -520,7 +518,7 @@ impl Operations for FloatOperations {
         match rhs {
             RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
             _ => Err(RuntimeError::IllegalOperation(
-            "Cannot compare Float with non-Float type".to_string(),
+                "Cannot compare Float with non-Float type".to_string(),
             )),
         }
     }
@@ -622,7 +620,7 @@ impl Operations for StringOperations {
         match rhs {
             RuntimeValue::String(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
             _ => Err(RuntimeError::IllegalOperation(
-            "Cannot compare String with non-String type".to_string(),
+                "Cannot compare String with non-String type".to_string(),
             )),
         }
     }
