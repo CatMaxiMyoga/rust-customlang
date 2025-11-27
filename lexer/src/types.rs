@@ -35,12 +35,24 @@ pub enum TokenKind {
     LeftBrace,
     /// }
     RightBrace,
+    /// <
+    LeftAngle,
+    /// >
+    RightAngle,
     /// ,
     Comma,
     /// =
     Equals,
     /// ;
     Semicolon,
+    /// >=
+    GreaterThanOrEqual,
+    /// <=
+    LessThanOrEqual,
+    /// ==
+    EqualsEquals,
+    /// !=
+    NotEquals,
     /// Represents an identifier.
     Identifier(String),
     /// Represents a keyword.

@@ -1,5 +1,4 @@
-> [!NOTE]
-> Updated last: 25/11/2025
+**Updated last: 27/11/2025** *(Up-To-Date)*
 
 I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
 These are the currently working language features (for more precise grammar, look at 
@@ -30,10 +29,19 @@ These are the currently working language features (for more precise grammar, loo
             - [`BoolToString(Boolean)`](#builtin-tostring)
     - [Operators](#operators)
         - [Operator Precedence](#operator-precedence)
-        - [Add `+`](#add-)
-        - [Subtract `-`](#subtract--)
-        - [Multiply `*`](#multiply-)
-        - [Divide `/`](#divide-)
+        - [Additive Operators](#additive-operators)
+            - [Add `+`](#add-)
+            - [Subtract `-`](#subtract--)
+        - [Multiplicative Operators](#multiplicative-operators)
+            - [Multiply `*`](#multiply-)
+            - [Divide `/`](#divide-)
+        - [Comparison Operators](#comparison-operators)
+            - [Equal `==`](#equals-comparison-)
+            - [Not Equal `!=`](#not-equals-comparison-)
+            - [Less Than `<`](#less-than-comparison-)
+            - [Greater Than `>`](#greater-than-comparison-)
+            - [Less Than or Equal To `<=`](#less-than-or-equal-to-comparison-)
+            - [Greater Than or Equal To `>=`](#greater-than-or-equal-to-comparison-)
     - [Errors](#errors)
         - [DivisionByZero](#division-by-zero-error)
         - [TypeMismatch](#type-mismatch-error)
@@ -331,17 +339,23 @@ String BoolToString(Boolean b) { ... }
 
 ## Operators
 ### Operator Precedence
-Of course, this language respects operator precedence, meaning multiplication and division before
-addition and subtraction, and parentheses before all.
+Of course, this language respects operator precedence, meaning
+[multiplicative operations](#multiplicative-operators) before
+[additive operations](#additive-operators), [comparison operations](#comparison-operators) after
+all and parentheses before all.
 ```
 5 + 5 * 2;
 >> 15
 
 (5 + 5) * 2;
 >> 20
+
+5 + 5 > 2 * 4;
+>> true
 ```
 
-### Add `+`
+### Additive Operators
+#### Add `+`
 To add two values together, if permitted, write it like this:
 
 ```
@@ -356,7 +370,7 @@ an error for this operator, it will result in an error.
 >> Error: IllegalOperation("Cannot add String with non-String type")
 ```
 
-### Subtract `-`
+#### Subtract `-`
 To subtract a value from another, if permitted, write it like this:
 
 ```
@@ -371,7 +385,8 @@ returns an error for this operator, it will result in an error.
 >> Error: IllegalOperation("Subtraction not supported for String type")
 ```
 
-### Multiply `*`
+### Multiplicative Operators
+#### Multiply `*`
 To multiply two values together, if permitted, write it like this:
 
 ```
@@ -386,7 +401,7 @@ it returns an error for this operator, it will result in an error.
 >> Error: IllegalOperation("Cannot multiply Float with non-numeric type")
 ```
 
-### Divide `/`
+#### Divide `/`
 To divide a value by another, if permitted, write it like this:
 
 ```
@@ -406,6 +421,93 @@ left type doesn't implement division with numbers.
 ```
 10 / 0;
 >> Error: DivisionByZero
+```
+
+### Comparison Operators
+#### Equals Comparison `==`
+Tests if two values **are** the same.
+```
+"Test" == "Test";
+>> true
+
+"Hello" == "World";
+>> false
+
+5 == 5;
+>> true
+```
+
+#### Not Equals Comparison `!=`
+Tests if two values are **not** the same.
+```
+"Hello" != "World";
+>> true
+
+5 != 5;
+>> false
+
+1.5 != 2.0;
+>> true
+```
+
+#### Less-Than Comparison `<`
+Tests if `lhs` is less than `rhs`.
+```
+lhs < rhs
+
+5 < 10;
+>> true
+
+215 < 215;
+>> false
+
+2.0 < 1.5;
+>> false
+```
+
+#### Greater-Than Comparison `>`
+Tests if `lhs` is greater than `rhs`.
+```
+lhs > rhs
+
+5 > 10;
+>> false
+
+215 > 215;
+>> false
+
+2.0 > 1.5;
+>> true
+```
+
+#### Less-Than Or Equal To Comparison `<=`
+Tests if `lhs` is either less than `rhs` or equal to it.
+```
+lhs <= rhs
+
+5 <= 10;
+>> true
+
+215 <= 215;
+>> true
+
+2.0 <= 1.5;
+>> false
+```
+
+#### Greater-Than Or Equal To Comparison `>=`
+Tests if `lhs` is either greater then `rhs` or equal to it.
+```
+lhs >= rhs
+
+5 >= 10;
+>> false
+
+215 >= 215;
+>> true
+
+2.0 >= 1.5;
+>> true
 ```
 
 ## Errors

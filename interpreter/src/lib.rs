@@ -294,6 +294,12 @@ impl<'a> Interpreter<'a> {
             Operator::Subtract => left - right,
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
+            Operator::Equals => left.eq(&right),
+            Operator::NotEquals => left.ne(&right),
+            Operator::LessThan => left.lt(&right),
+            Operator::GreaterThan => left.gt(&right),
+            Operator::LessThanOrEqual => left.le(&right),
+            Operator::GreaterThanOrEqual => left.ge(&right),
         }
     }
 
@@ -409,6 +415,20 @@ impl<'a> Interpreter<'a> {
                     implementation,
                 }),
             )) => (return_type.clone(), parameters.clone(), *implementation),
+            None => {
+                if let Some((
+                    return_type,
+                    Some(RuntimeValue::BuiltinFunction {
+                        parameters,
+                        implementation,
+                    }),
+                )) = self.scope.find_in_parent(name)
+                {
+                    (return_type.clone(), parameters.clone(), *implementation)
+                } else {
+                    unreachable!()
+                }
+            }
             _ => {
                 unreachable!()
             }

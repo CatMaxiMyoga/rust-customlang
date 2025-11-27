@@ -24,6 +24,18 @@ pub enum Operator {
     Multiply,
     /// Represents binary division.
     Divide,
+    /// Represents equality comparison.
+    Equals,
+    /// Represents inequality comparison.
+    NotEquals,
+    /// Represents less than comparison.
+    LessThan,
+    /// Represents greater than comparison.
+    GreaterThan,
+    /// Represents less than or equal comparison.
+    LessThanOrEqual,
+    /// Represents greater than or equal comparison.
+    GreaterThanOrEqual,
 }
 
 /// Represents expressions in the AST.
@@ -48,7 +60,7 @@ pub enum Expression {
         name: String,
         /// The arguments passed to the function.
         arguments: Vec<Expression>,
-    }
+    },
 }
 
 /// Represents statements in the AST.

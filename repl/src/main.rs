@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
+use interpreter::{Interpreter, types::Scope};
 use lexer::{Lexer, types::Token};
 use parser::Parser;
-use interpreter::{Interpreter, types::Scope};
 use std::io::{self, Write};
 
 fn main() {
@@ -46,8 +46,8 @@ fn main() {
                 let msg: String = e.to_lowercase();
 
                 if msg.ends_with("end of input")
-                || msg.ends_with("endoffile")
-                || msg.ends_with("'endoffile'")
+                    || msg.ends_with("endoffile")
+                    || msg.ends_with("'endoffile'")
                 {
                     continue;
                 }

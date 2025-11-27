@@ -15,6 +15,15 @@ pub struct Parser {
 }
 
 impl Parser {
+    const COMPARISON_TOKEN: [TokenKind; 6] = [
+        TokenKind::EqualsEquals,
+        TokenKind::NotEquals,
+        TokenKind::LeftAngle,
+        TokenKind::RightAngle,
+        TokenKind::LessThanOrEqual,
+        TokenKind::GreaterThanOrEqual,
+    ];
+
     /// Parses the tokens and returns the root of the AST.
     ///
     /// # Errors
@@ -160,13 +169,13 @@ impl Parser {
     fn parse_function_declaration(&mut self) -> Result<Statement, String> {
         let return_type: String = match &self.peek()?.kind {
             TokenKind::Identifier(name) => name.clone(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
         self.advance();
 
         let name: String = match &self.peek()?.kind {
             TokenKind::Identifier(name) => name.clone(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
         self.advance();
 
@@ -255,22 +264,32 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Expression, String> {
-        self.parse_precedence(0)
+        self.parse_precedence(0, false)
     }
 
-    const fn operator_precedence(kind: &TokenKind) -> Option<u8> {
+    fn operator_precedence(kind: &TokenKind) -> Option<u8> {
         match kind {
-            TokenKind::Asterisk | TokenKind::Slash => Some(2),
-            TokenKind::Plus | TokenKind::Minus => Some(1),
+            TokenKind::Asterisk | TokenKind::Slash => Some(3),
+            TokenKind::Plus | TokenKind::Minus => Some(2),
+            _ if Self::COMPARISON_TOKEN.contains(kind) => Some(1),
             _ => None,
         }
     }
 
-    fn parse_precedence(&mut self, min_prec: u8) -> Result<Expression, String> {
+    fn parse_precedence(
+        &mut self,
+        min_prec: u8,
+        seen_comparison: bool,
+    ) -> Result<Expression, String> {
         let mut left: Expression = self.parse_primary()?;
 
         while let Ok(next) = self.peek() {
             let op_token: Token = next.clone();
+            let is_comparison_op: bool = Self::COMPARISON_TOKEN.contains(&op_token.kind);
+
+            if seen_comparison && is_comparison_op {
+                return Err(String::from("Chained comparison operators are not allowed"));
+            }
 
             let prec: u8 = match Self::operator_precedence(&op_token.kind) {
                 Some(p) if p >= min_prec => p,
@@ -279,13 +298,20 @@ impl Parser {
 
             self.advance();
 
-            let right: Expression = self.parse_precedence(prec + 1)?;
+            let right: Expression =
+                self.parse_precedence(prec + 1, seen_comparison || is_comparison_op)?;
 
             let operator: Operator = match op_token.kind {
                 TokenKind::Plus => Operator::Add,
                 TokenKind::Minus => Operator::Subtract,
                 TokenKind::Asterisk => Operator::Multiply,
                 TokenKind::Slash => Operator::Divide,
+                TokenKind::EqualsEquals => Operator::Equals,
+                TokenKind::NotEquals => Operator::NotEquals,
+                TokenKind::LeftAngle => Operator::LessThan,
+                TokenKind::RightAngle => Operator::GreaterThan,
+                TokenKind::LessThanOrEqual => Operator::LessThanOrEqual,
+                TokenKind::GreaterThanOrEqual => Operator::GreaterThanOrEqual,
                 _ => unreachable!(),
             };
 

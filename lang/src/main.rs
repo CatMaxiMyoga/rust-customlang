@@ -2,7 +2,10 @@
 
 use std::path::Path;
 
-use interpreter::{Interpreter, types::{Scope, RuntimeError}};
+use interpreter::{
+    Interpreter,
+    types::{RuntimeError, Scope},
+};
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
 
@@ -44,7 +47,7 @@ fn main() {
         Err(e) => {
             eprintln!("Lexer error: {e}");
             std::process::exit(1);
-        },
+        }
     };
 
     let program: Result<Program, String> = Parser::parse(tokens);
@@ -53,7 +56,7 @@ fn main() {
         Err(e) => {
             eprintln!("Parser error: {e}");
             std::process::exit(1);
-        },
+        }
     };
 
     let mut environment: Scope = Scope::default();

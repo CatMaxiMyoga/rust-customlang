@@ -32,28 +32,6 @@ impl Lexer {
         'lex: while lexer.index < lexer.source.len() {
             let current_char: char = lexer.source[lexer.index];
 
-            let single: Option<TokenKind> = match current_char {
-                '(' => Some(TokenKind::LeftParen),
-                ')' => Some(TokenKind::RightParen),
-                '{' => Some(TokenKind::LeftBrace),
-                '}' => Some(TokenKind::RightBrace),
-                '+' => Some(TokenKind::Plus),
-                '-' => Some(TokenKind::Minus),
-                '*' => Some(TokenKind::Asterisk),
-                '/' => Some(TokenKind::Slash),
-                ',' => Some(TokenKind::Comma),
-                ';' => Some(TokenKind::Semicolon),
-                '=' => Some(TokenKind::Equals),
-                _ => None,
-            };
-
-            if let Some(kind) = single {
-                tokens.push(Token::new(kind, lexer.line, lexer.column));
-                lexer.index += 1;
-                lexer.column += 1;
-                continue 'lex;
-            }
-
             if current_char.is_whitespace() {
                 if current_char == '\n' {
                     lexer.line += 1;
@@ -69,6 +47,10 @@ impl Lexer {
                 continue 'lex;
             }
 
+            if lexer.single_char_token(&mut tokens) {
+                continue 'lex;
+            }
+
             return Err(format!(
                 "Unknown character '{}' at {}:{}",
                 current_char, lexer.line, lexer.column
@@ -81,7 +63,61 @@ impl Lexer {
     }
 
     fn multiple_char_token(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
+        let current_char: char = self.source[self.index];
+
+        let double: Option<TokenKind>;
+        if let Some(next_char) = self.source.get(self.index + 1) {
+            let double_string: String = format!("{}{}", current_char, *next_char);
+            let double_str: &str = double_string.as_str();
+
+            double = match double_str {
+                ">=" => Some(TokenKind::GreaterThanOrEqual),
+                "<=" => Some(TokenKind::LessThanOrEqual),
+                "==" => Some(TokenKind::EqualsEquals),
+                "!=" => Some(TokenKind::NotEquals),
+                _ => None,
+            }
+        } else {
+            return Ok(false);
+        }
+
+        if let Some(kind) = double {
+            tokens.push(Token::new(kind, self.line, self.column));
+            self.index += 2;
+            self.column += 2;
+            return Ok(true);
+        }
+
         Ok(self.number(tokens)? || self.identifier(tokens) || self.string(tokens)?)
+    }
+
+    fn single_char_token(&mut self, tokens: &mut Vec<Token>) -> bool {
+        let current_char: char = self.source[self.index];
+
+        let single: Option<TokenKind> = match current_char {
+            '(' => Some(TokenKind::LeftParen),
+            ')' => Some(TokenKind::RightParen),
+            '{' => Some(TokenKind::LeftBrace),
+            '}' => Some(TokenKind::RightBrace),
+            '<' => Some(TokenKind::LeftAngle),
+            '>' => Some(TokenKind::RightAngle),
+            '+' => Some(TokenKind::Plus),
+            '-' => Some(TokenKind::Minus),
+            '*' => Some(TokenKind::Asterisk),
+            '/' => Some(TokenKind::Slash),
+            ',' => Some(TokenKind::Comma),
+            ';' => Some(TokenKind::Semicolon),
+            '=' => Some(TokenKind::Equals),
+            _ => None,
+        };
+
+        if let Some(kind) = single {
+            tokens.push(Token::new(kind, self.line, self.column));
+            self.index += 1;
+            self.column += 1;
+            return true;
+        }
+        false
     }
 
     fn number(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
