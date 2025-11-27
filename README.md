@@ -1,5 +1,4 @@
-**<div style="color: #ffaaaa;">Updated last: 27/11/2025</div>**
-*(<div style="color: #aaffaa;">Up-To-Date</div>)*
+**Updated last: 27/11/2025** *(Up-To-Date)*
 
 I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
 These are the currently working language features (for more precise grammar, look at 
