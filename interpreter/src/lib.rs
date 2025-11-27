@@ -415,6 +415,20 @@ impl<'a> Interpreter<'a> {
                     implementation,
                 }),
             )) => (return_type.clone(), parameters.clone(), *implementation),
+            None => {
+                if let Some((
+                    return_type,
+                    Some(RuntimeValue::BuiltinFunction {
+                        parameters,
+                        implementation,
+                    }),
+                )) = self.scope.find_in_parent(name)
+                {
+                    (return_type.clone(), parameters.clone(), *implementation)
+                } else {
+                    unreachable!()
+                }
+            }
             _ => {
                 unreachable!()
             }
