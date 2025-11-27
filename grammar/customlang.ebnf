@@ -28,7 +28,10 @@ FunctionType = Type | "Void" ;
 
 Literal = Integer | Float | String ;
 
-Expression = Term, { _, ("+" | "-"), _, Term } ;
+Expression = ComparisonExpression ;
+ComparisonExpression = AdditiveExpression,
+  [ _, ("==" | "!=" | "<" | "<=" | ">" | ">="), _, AdditiveExpression ] ;
+AdditiveExpression = Term, { _, ("+" | "-"), _, Term } ;
 Term = Factor, { _, ("*" | "/"), _, Factor } ;
 Factor = Literal | Identifier | FunctionCall | "(", _, Expression, _, ")" ;
 
