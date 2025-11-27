@@ -1,6 +1,6 @@
 > [!NOTE]
 > **Updated last: 27/11/2025**
-> Up-To-Date
+> *(Up-To-Date)*
 
 I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
 These are the currently working language features (for more precise grammar, look at 
