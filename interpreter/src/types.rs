@@ -155,10 +155,19 @@ pub enum RuntimeError {
 }
 
 trait Operations {
-    fn add(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
-    fn sub(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
-    fn mul(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
-    fn div(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    // Arithmetic operations
+    fn add(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn sub(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn mul(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn div(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+
+    // Comparison operations
+    fn eq(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn ne(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn lt(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn le(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn gt(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
+    fn ge(&self, lsh: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult;
 }
 
 /// Represents all types of values Expressions can return when evaluated.
@@ -218,6 +227,36 @@ impl RuntimeValue {
             },
             Self::Void => &NoOperations { name: "Void" },
         }
+    }
+
+    /// `==`
+    pub(crate) fn eq(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().eq(self, rhs)
+    }
+
+    /// `!=`
+    pub(crate) fn ne(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().ne(self, rhs)
+    }
+
+    /// `<`
+    pub(crate) fn lt(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().lt(self, rhs)
+    }
+
+    /// `<=`
+    pub(crate) fn le(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().le(self, rhs)
+    }
+
+    /// `>`
+    pub(crate) fn gt(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().gt(self, rhs)
+    }
+
+    /// `>=`
+    pub(crate) fn ge(&self, rhs: &Self) -> ExpressionResult {
+        self.ops().ge(self, rhs)
     }
 }
 
@@ -318,6 +357,78 @@ impl Operations for IntegerOperations {
             )),
         }
     }
+
+    fn eq(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs == rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
+
+    fn ne(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+            "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
+
+    fn lt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs < rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
+
+    fn le(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs <= rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
+
+    fn gt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs > rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
+
+    fn ge(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Integer(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Integer(rhs) => Ok(RuntimeValue::Boolean(lhs >= rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Integer with non-Integer type".to_string(),
+            )),
+        }
+    }
 }
 
 struct FloatOperations;
@@ -389,9 +500,84 @@ impl Operations for FloatOperations {
             )),
         }
     }
+
+    fn eq(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs == rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
+
+    fn ne(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+            "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
+
+    fn lt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs < rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
+
+    fn le(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs <= rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
+
+    fn gt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs > rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
+
+    fn ge(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::Float(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::Float(rhs) => Ok(RuntimeValue::Boolean(lhs >= rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare Float with non-Float type".to_string(),
+            )),
+        }
+    }
 }
 
 struct StringOperations;
+impl StringOperations {
+    const NOOP: NoOperations = NoOperations { name: "String" };
+}
 impl Operations for StringOperations {
     fn add(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
         let RuntimeValue::String(lhs) = lhs else {
@@ -405,22 +591,56 @@ impl Operations for StringOperations {
         }
     }
 
-    fn sub(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
-        Err(RuntimeError::IllegalOperation(
-            "Subtraction not supported for String type".to_string(),
-        ))
+    fn sub(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.sub(lhs, rhs)
     }
 
-    fn mul(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
-        Err(RuntimeError::IllegalOperation(
-            "Multiplication not supported for String type".to_string(),
-        ))
+    fn mul(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.mul(lhs, rhs)
     }
 
-    fn div(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
-        Err(RuntimeError::IllegalOperation(
-            "Division not supported for String type".to_string(),
-        ))
+    fn div(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.div(lhs, rhs)
+    }
+
+    fn eq(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::String(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::String(rhs) => Ok(RuntimeValue::Boolean(lhs == rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+                "Cannot compare String with non-String type".to_string(),
+            )),
+        }
+    }
+
+    fn ne(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        let RuntimeValue::String(lhs) = lhs else {
+            unreachable!()
+        };
+        match rhs {
+            RuntimeValue::String(rhs) => Ok(RuntimeValue::Boolean(lhs != rhs)),
+            _ => Err(RuntimeError::IllegalOperation(
+            "Cannot compare String with non-String type".to_string(),
+            )),
+        }
+    }
+
+    fn lt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.lt(lhs, rhs)
+    }
+
+    fn le(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.le(lhs, rhs)
+    }
+
+    fn gt(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.gt(lhs, rhs)
+    }
+
+    fn ge(&self, lhs: &RuntimeValue, rhs: &RuntimeValue) -> ExpressionResult {
+        Self::NOOP.ge(lhs, rhs)
     }
 }
 
@@ -449,6 +669,42 @@ impl Operations for NoOperations {
     fn div(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
         Err(RuntimeError::IllegalOperation(format!(
             "Division not supported for {} type",
+            self.name
+        )))
+    }
+    fn eq(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '==' not supported for {} type",
+            self.name
+        )))
+    }
+    fn ne(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '!=' not supported for {} type",
+            self.name
+        )))
+    }
+    fn lt(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '<' not supported for {} type",
+            self.name
+        )))
+    }
+    fn le(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '<=' not supported for {} type",
+            self.name
+        )))
+    }
+    fn gt(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '>' not supported for {} type",
+            self.name
+        )))
+    }
+    fn ge(&self, _lhs: &RuntimeValue, _rhs: &RuntimeValue) -> ExpressionResult {
+        Err(RuntimeError::IllegalOperation(format!(
+            "Comparison '>=' not supported for {} type",
             self.name
         )))
     }

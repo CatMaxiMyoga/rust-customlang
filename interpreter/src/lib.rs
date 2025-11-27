@@ -294,6 +294,12 @@ impl<'a> Interpreter<'a> {
             Operator::Subtract => left - right,
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
+            Operator::Equals => left.eq(&right),
+            Operator::NotEquals => left.ne(&right),
+            Operator::LessThan => left.lt(&right),
+            Operator::GreaterThan => left.gt(&right),
+            Operator::LessThanOrEqual => left.le(&right),
+            Operator::GreaterThanOrEqual => left.ge(&right),
         }
     }
 
