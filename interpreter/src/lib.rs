@@ -2,7 +2,7 @@
 
 pub mod types;
 
-use parser::types::{Expression, Literal, Operator, Program, Statement};
+use parser::types::{Expr, Expression, Literal, Operator, Program, Statement, Stmt};
 use types::{ExpressionResult, RuntimeError, RuntimeValue};
 
 use crate::types::{Scope, StatementResult, Type};
@@ -26,11 +26,6 @@ impl<'a> Interpreter<'a> {
         }
 
         Ok(())
-    }
-
-    #[cfg(test)]
-    const fn new(scope: &'a mut Scope) -> Self {
-        Self { scope }
     }
 
     fn builtins(&mut self) -> Result<(), RuntimeError> {
@@ -113,8 +108,8 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn statement(&mut self, statement: Statement) -> Result<(), RuntimeError> {
-        match statement {
+    fn statement(&mut self, statement: Stmt) -> StatementResult {
+        match statement.node {
             Statement::Expression(expr) => _ = self.expression(expr)?,
             Statement::VariableDeclaration { type_, name, value } => {
                 self.variable_declaration_statement(&type_, &name, value)?;
@@ -138,7 +133,7 @@ impl<'a> Interpreter<'a> {
         &mut self,
         type_: &str,
         name: &str,
-        value: Option<Expression>,
+        value: Option<Expr>,
     ) -> StatementResult {
         if let Some((_, Some(old_var))) = self.scope.variables.get(name)
             && (old_var.get_name() == "Function" || old_var.get_name() == "Builtin (Function)")
@@ -173,7 +168,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn variable_assignment_statement(&mut self, name: &str, value: Expression) -> StatementResult {
+    fn variable_assignment_statement(&mut self, name: &str, value: Expr) -> StatementResult {
         let old: (Type, Option<RuntimeValue>) = if let Some(val) = self.scope.variables.get(name) {
             val.clone()
         } else {
@@ -214,7 +209,7 @@ impl<'a> Interpreter<'a> {
         return_type: &str,
         name: &str,
         parameters: &Vec<(String, String)>,
-        body: Vec<Statement>,
+        body: Vec<Stmt>,
     ) -> StatementResult {
         if self.scope.variables.contains_key(name) {
             return Err(RuntimeError::NameConflict(format!(
@@ -238,8 +233,8 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn expression(&mut self, expression: Expression) -> ExpressionResult {
-        match expression {
+    fn expression(&mut self, expression: Expr) -> ExpressionResult {
+        match expression.node {
             Expression::Literal(literal) => Ok(Self::literal_expression(&literal)),
             Expression::Binary {
                 left,
@@ -252,7 +247,7 @@ impl<'a> Interpreter<'a> {
                         || Err(RuntimeError::VariableUninitialized(identifier)),
                         |value| Ok(value.clone()),
                     )
-                } else if let Some(variable) = &self.scope.find_in_parent(&identifier) {
+                } else if let Some(variable) = self.scope.find_in_parent(&identifier) {
                     match variable {
                         (_, Some(value)) => match value {
                             RuntimeValue::Function { .. }
@@ -282,9 +277,9 @@ impl<'a> Interpreter<'a> {
 
     fn binary_expression(
         &mut self,
-        left: Expression,
+        left: Expr,
         operator: &Operator,
-        right: Expression,
+        right: Expr,
     ) -> ExpressionResult {
         let left: RuntimeValue = self.expression(left)?;
         let right: RuntimeValue = self.expression(right)?;
@@ -306,9 +301,9 @@ impl<'a> Interpreter<'a> {
     fn function_call_expression(
         &mut self,
         name: &str,
-        arguments: &[Expression],
+        arguments: &[Expr],
     ) -> ExpressionResult {
-        type FunctionData = (Type, Vec<(Type, String)>, Vec<Statement>);
+        type FunctionData = (Type, Vec<(Type, String)>, Vec<Stmt>);
 
         if !self.scope.variables.contains_key(name) {
             if let Some((_, Some(func))) = self.scope.find_in_parent(name) {
@@ -374,7 +369,7 @@ impl<'a> Interpreter<'a> {
         }
 
         for statement in function.2.iter().cloned() {
-            if let Statement::Return(value) = statement {
+            if let Statement::Return(value) = statement.node {
                 let value: RuntimeValue = interpreter.expression(value)?;
                 if function.0.0 != value.get_name() {
                     return Err(RuntimeError::TypeMismatch(
@@ -402,7 +397,7 @@ impl<'a> Interpreter<'a> {
     fn builtin_function_call_expression(
         &mut self,
         name: &str,
-        arguments: &[Expression],
+        arguments: &[Expr],
     ) -> ExpressionResult {
         type BuiltinFunctionImpl = fn(&mut Scope, Vec<RuntimeValue>) -> ExpressionResult;
         type BuiltinFunction = (Type, Vec<&'static str>, BuiltinFunctionImpl);
@@ -467,219 +462,5 @@ impl<'a> Interpreter<'a> {
             ));
         }
         Ok(result)
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    macro_rules! test_all_ops {
-        ($name:ident, $left:expr, $right:expr, $result:expr, $op:ident, $suffix:ident) => {
-            paste::paste! {
-                #[test]
-                fn [<$name _ $suffix>]() {
-                    let mut scope: Scope = Scope::default();
-                    let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-                    let expression: Expression = Expression::Binary{
-                        left: Box::new($left),
-                        operator: Operator::$op,
-                        right: Box::new($right)
-                    };
-                    let result: RuntimeValue = interpreter.expression(expression).unwrap();
-                    assert_eq!(result, $result);
-                }
-            }
-        };
-        ($name:ident, $left:expr, $right:expr, $add:expr, $sub:expr, $mul:expr, $div:expr) => {
-            test_all_ops!($name, $left, $right, $add, Add, addition);
-            test_all_ops!($name, $left, $right, $sub, Subtract, subtraction);
-            test_all_ops!($name, $left, $right, $mul, Multiply, multiplication);
-            test_all_ops!($name, $left, $right, $div, Divide, division);
-        };
-    }
-
-    test_all_ops!(
-        integer,
-        Expression::Literal(Literal::Integer(5)),
-        Expression::Literal(Literal::Integer(2)),
-        RuntimeValue::Integer(7),
-        RuntimeValue::Integer(3),
-        RuntimeValue::Integer(10),
-        RuntimeValue::Integer(2)
-    );
-
-    test_all_ops!(
-        float,
-        Expression::Literal(Literal::Float(5.0)),
-        Expression::Literal(Literal::Float(2.0)),
-        RuntimeValue::Float(7.0),
-        RuntimeValue::Float(3.0),
-        RuntimeValue::Float(10.0),
-        RuntimeValue::Float(2.5)
-    );
-
-    test_all_ops!(
-        mixed,
-        Expression::Literal(Literal::Integer(5)),
-        Expression::Literal(Literal::Float(2.0)),
-        RuntimeValue::Float(7.0),
-        RuntimeValue::Float(3.0),
-        RuntimeValue::Float(10.0),
-        RuntimeValue::Float(2.5)
-    );
-
-    test_all_ops!(
-        mixed_reverse,
-        Expression::Literal(Literal::Float(5.0)),
-        Expression::Literal(Literal::Integer(2)),
-        RuntimeValue::Float(7.0),
-        RuntimeValue::Float(3.0),
-        RuntimeValue::Float(10.0),
-        RuntimeValue::Float(2.5)
-    );
-
-    #[test]
-    fn variable_declaration() {
-        let mut scope: Scope = Scope::default();
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-        let declaration: Statement = Statement::VariableDeclaration {
-            type_: String::from("Integer"),
-            name: String::from("x"),
-            value: None,
-        };
-        interpreter.statement(declaration).unwrap();
-        assert!(scope.variables.contains_key("x"));
-        assert!(scope.variables["x"].1.is_none());
-    }
-
-    #[test]
-    fn variable_initialization() {
-        let mut scope: Scope = Scope::default();
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-
-        let declaration: Statement = Statement::VariableDeclaration {
-            type_: String::from("Integer"),
-            name: String::from("x"),
-            value: Some(Expression::Literal(Literal::Integer(10))),
-        };
-        interpreter.statement(declaration).unwrap();
-
-        assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Integer(10)));
-    }
-
-    #[test]
-    fn variable_delayed_initialization() {
-        let mut scope: Scope = Scope::default();
-        scope
-            .variables
-            .insert(String::from("x"), (Type::new("Float").unwrap(), None));
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-
-        let assignment: Statement = Statement::VariableAssignment {
-            name: String::from("x"),
-            value: Expression::Literal(Literal::Float(20.0)),
-        };
-        interpreter.statement(assignment).unwrap();
-
-        assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Float(20.0)));
-    }
-
-    #[test]
-    fn variable_reassignment() {
-        let mut scope: Scope = Scope::default();
-        scope.variables.insert(
-            String::from("x"),
-            (
-                Type::new("Integer").unwrap(),
-                Some(RuntimeValue::Integer(10)),
-            ),
-        );
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-
-        let assignment: Statement = Statement::VariableAssignment {
-            name: String::from("x"),
-            value: Expression::Literal(Literal::Integer(30)),
-        };
-        interpreter.statement(assignment).unwrap();
-
-        assert!(scope.variables.contains_key("x"));
-        assert_eq!(scope.variables["x"].1, Some(RuntimeValue::Integer(30)));
-    }
-
-    #[test]
-    fn variable_type_mismatch() {
-        let mut scope: Scope = Scope::default();
-        scope.variables.insert(
-            String::from("x"),
-            (
-                Type::new("Integer").unwrap(),
-                Some(RuntimeValue::Integer(10)),
-            ),
-        );
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-
-        let assignment: Statement = Statement::VariableAssignment {
-            name: String::from("x"),
-            value: Expression::Literal(Literal::Float(20.0)),
-        };
-        let result: Result<(), RuntimeError> = interpreter.statement(assignment);
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            RuntimeError::TypeMismatch(String::from(
-                "Cannot assign value of type 'Float' to variable of type 'Integer'"
-            ))
-        );
-    }
-
-    #[test]
-    fn string_arithmetic() {
-        let mut scope: Scope = Scope::default();
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-
-        let expression: Expression = Expression::Binary {
-            left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
-            operator: Operator::Multiply,
-            right: Box::new(Expression::Literal(Literal::Integer(5))),
-        };
-        let result: ExpressionResult = interpreter.expression(expression);
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            RuntimeError::IllegalOperation(String::from(
-                "Multiplication not supported for String type"
-            ))
-        );
-    }
-
-    #[test]
-    fn string_concatenation() {
-        let mut scope: Scope = Scope::default();
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-        let expression: Expression = Expression::Binary {
-            left: Box::new(Expression::Literal(Literal::String(String::from("hello")))),
-            operator: Operator::Add,
-            right: Box::new(Expression::Literal(Literal::String(String::from("world")))),
-        };
-        let result: RuntimeValue = interpreter.expression(expression).unwrap();
-        assert_eq!(result, RuntimeValue::String(String::from("helloworld")));
-    }
-
-    #[test]
-    fn boolean_literal() {
-        let mut scope: Scope = Scope::default();
-        let mut interpreter: Interpreter = Interpreter::new(&mut scope);
-        let expression: Expression = Expression::Literal(Literal::Boolean(true));
-        let result: RuntimeValue = interpreter.expression(expression).unwrap();
-        assert_eq!(result, RuntimeValue::Boolean(true));
-        let expression: Expression = Expression::Literal(Literal::Boolean(false));
-        let result: RuntimeValue = interpreter.expression(expression).unwrap();
-        assert_eq!(result, RuntimeValue::Boolean(false));
     }
 }

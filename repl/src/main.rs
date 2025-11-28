@@ -3,9 +3,13 @@
 use interpreter::{Interpreter, types::Scope};
 use lexer::{Lexer, types::Token};
 use parser::Parser;
+use regex::Regex;
 use std::io::{self, Write};
 
 fn main() {
+    let unexpected_eof: Regex =
+        Regex::new(r"'?endoffile'? at \d+:\d+$").expect("Failed to compile valid regex.");
+
     let mut environment: Scope = Scope::default();
     let mut buffer: String = String::new();
 
@@ -45,10 +49,7 @@ fn main() {
             Err(e) => {
                 let msg: String = e.to_lowercase();
 
-                if msg.ends_with("end of input")
-                    || msg.ends_with("endoffile")
-                    || msg.ends_with("'endoffile'")
-                {
+                if unexpected_eof.is_match(msg.trim_end()) {
                     continue;
                 }
 
