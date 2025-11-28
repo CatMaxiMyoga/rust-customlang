@@ -48,18 +48,18 @@ pub enum Expression {
     /// A binary expression.
     Binary {
         /// The left-hand side expression.
-        left: Box<Expression>,
+        left: Box<Expr>,
         /// The operator.
         operator: Operator,
         /// The right-hand side expression.
-        right: Box<Expression>,
+        right: Box<Expr>,
     },
     /// A function call expression.
     FunctionCall {
         /// The name of the function being called.
         name: String,
         /// The arguments passed to the function.
-        arguments: Vec<Expression>,
+        arguments: Vec<Expr>,
     },
 }
 
@@ -73,14 +73,14 @@ pub enum Statement {
         /// The name of the variable.
         name: String,
         /// The initial value of the variable.
-        value: Option<Expression>,
+        value: Option<Expr>,
     },
     /// Variable assignment statement.
     VariableAssignment {
         /// The name of the variable.
         name: String,
         /// The new value of the variable.
-        value: Expression,
+        value: Expr,
     },
     /// A function declaration statement.
     FunctionDeclaration {
@@ -91,17 +91,40 @@ pub enum Statement {
         /// The parameters of the function `(Type, Identifier)`.
         parameters: Vec<(String, String)>,
         /// The body of the function.
-        body: Vec<Statement>,
+        body: Vec<Stmt>,
     },
     /// A return statement.
-    Return(Expression),
+    Return(Expr),
     /// An expression statement.
-    Expression(Expression),
+    Expression(Expr),
 }
 
 /// The root node of the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     /// A list of statements in the program.
-    pub statements: Vec<Statement>,
+    pub statements: Vec<Stmt>,
 }
+
+/// Represents the starting and ending position of a node in the source code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Span {
+    /// The starting position (line, column).
+    pub start: (usize, usize),
+    /// The ending position (line, column).
+    pub end: (usize, usize),
+}
+
+/// A node with its associated span in the source code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Spanned<T> {
+    /// The value with its span.
+    pub node: T,
+    /// The span of the node.
+    pub span: Span,
+}
+
+/// Spanned statement
+pub type Stmt = Spanned<Statement>;
+/// Spanned expression
+pub type Expr = Spanned<Expression>;

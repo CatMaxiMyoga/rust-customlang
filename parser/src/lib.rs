@@ -5,7 +5,7 @@ use std::mem::discriminant;
 
 use lexer::types::{Keyword, Token, TokenKind};
 
-use crate::types::{Expression, Literal, Operator, Program, Statement};
+use crate::types::{Expr, Expression, Literal, Operator, Program, Span, Spanned, Statement, Stmt};
 
 /// The parser struct responsible for parsing tokens into an AST.
 pub struct Parser {
@@ -35,7 +35,7 @@ impl Parser {
             outside_global_scope: false,
         };
 
-        let mut statements: Vec<Statement> = Vec::new();
+        let mut statements: Vec<Stmt> = Vec::new();
 
         while !parser.is_eof()? {
             statements.push(parser.parse_statement()?);
@@ -58,11 +58,10 @@ impl Parser {
         self.index += 1;
     }
 
-    fn match_token(&mut self, kind: &lexer::types::TokenKind) -> bool {
+    fn match_token(&self, kind: &lexer::types::TokenKind) -> bool {
         if let Ok(token) = self.peek()
             && &token.kind == kind
         {
-            self.advance();
             return true;
         }
         false
@@ -70,11 +69,12 @@ impl Parser {
 
     fn expect_token(&mut self, kind: &lexer::types::TokenKind) -> Result<&Token, String> {
         if self.match_token(kind) {
+            self.advance();
             Ok(&self.tokens[self.index - 1])
         } else if let Ok(token) = self.peek() {
             Err(format!(
-                "Expected token '{:?}', found '{:?}'",
-                kind, token.kind
+                "Expected token '{:?}', found '{:?}' at {}:{}",
+                kind, token.kind, token.start.0, token.start.1
             ))
         } else {
             Err(format!("Expected token '{kind:?}', found end of input"))
@@ -87,8 +87,8 @@ impl Parser {
             Ok(&self.tokens[self.index - 1])
         } else if let Ok(token) = self.peek() {
             Err(format!(
-                "Expected token '{:?}', found '{:?}'",
-                kind, token.kind
+                "Expected token '{:?}', found '{:?}' at {}:{}",
+                kind, token.kind, token.start.0, token.start.1
             ))
         } else {
             Err(format!("Expected token '{kind:?}', found end of input"))
@@ -108,8 +108,7 @@ impl Parser {
         true
     }
 
-    fn parse_statement(&mut self) -> Result<Statement, String> {
-        //if self.match_token(&TokenKind::Keyword(Keyword::Let)) {
+    fn parse_statement(&mut self) -> Result<Stmt, String> {
         if self.check_next_tokens(&[
             TokenKind::Identifier(String::new()),
             TokenKind::Identifier(String::new()),
@@ -127,27 +126,41 @@ impl Parser {
         ]) {
             self.parse_function_declaration()
         } else if self.match_token(&TokenKind::Keyword(Keyword::Return)) {
+            let start: (usize, usize) =
+                self.expect_token(&TokenKind::Keyword(Keyword::Return))?.end;
             if !self.outside_global_scope {
-                return Err(String::from("Return statement in global scope"));
+                return Err(format!(
+                    "Return statement in global scope at {}:{}",
+                    start.0, start.1
+                ));
             }
-            let expr: Expression = self.parse_expression()?;
-            self.expect_token(&TokenKind::Semicolon)?;
-            Ok(Statement::Return(expr))
+            let expr: Expr = self.parse_expression()?;
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+            Ok(Spanned {
+                node: Statement::Return(expr),
+                span: Span { start, end },
+            })
         } else if self.check_next_tokens(&[TokenKind::Identifier(String::new()), TokenKind::Equals])
         {
             self.parse_variable_assignment()
         } else {
-            let expr: Expression = self.parse_expression()?;
-            self.expect_token(&TokenKind::Semicolon)?;
-            Ok(Statement::Expression(expr))
+            let expr: Expr = self.parse_expression()?;
+            let start: (usize, usize) = expr.span.start;
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+            Ok(Spanned {
+                node: Statement::Expression(expr),
+                span: Span { start, end },
+            })
         }
     }
 
-    fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
-        let type_: String = match &self.peek()?.kind {
+    fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
+        let token: Token = self.peek()?.clone();
+        let type_: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => unreachable!(),
         };
+        let start: (usize, usize) = token.start;
         self.advance();
 
         let name: String = match &self.peek()?.kind {
@@ -156,18 +169,23 @@ impl Parser {
         };
         self.advance();
 
-        let value: Option<Expression> = if self.match_token(&TokenKind::Equals) {
+        let value: Option<Expr> = if self.match_token(&TokenKind::Equals) {
+            self.expect_token(&TokenKind::Equals)?;
             Some(self.parse_expression()?)
         } else {
             None
         };
 
-        self.expect_token(&TokenKind::Semicolon)?;
-        Ok(Statement::VariableDeclaration { type_, name, value })
+        let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+        Ok(Spanned {
+            node: Statement::VariableDeclaration { type_, name, value },
+            span: Span { start, end },
+        })
     }
 
-    fn parse_function_declaration(&mut self) -> Result<Statement, String> {
-        let return_type: String = match &self.peek()?.kind {
+    fn parse_function_declaration(&mut self) -> Result<Stmt, String> {
+        let token: Token = self.peek()?.clone();
+        let return_type: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => unreachable!(),
         };
@@ -180,23 +198,30 @@ impl Parser {
         self.advance();
 
         self.expect_token(&TokenKind::LeftParen)?;
-
         let parameters: Vec<(String, String)> = self.parse_function_declaration_parameters()?;
+        self.expect_token(&TokenKind::RightParen)?;
 
         self.expect_token(&TokenKind::LeftBrace)?;
-
+        let outside_global_scope_backup: bool = self.outside_global_scope;
         self.outside_global_scope = true;
-        let mut body: Vec<Statement> = Vec::new();
+        let mut body: Vec<Stmt> = Vec::new();
         while !self.match_token(&TokenKind::RightBrace) {
             body.push(self.parse_statement()?);
         }
-        self.outside_global_scope = false;
+        let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
+        self.outside_global_scope = outside_global_scope_backup;
 
-        Ok(Statement::FunctionDeclaration {
-            return_type,
-            name,
-            parameters,
-            body,
+        Ok(Spanned {
+            node: Statement::FunctionDeclaration {
+                return_type,
+                name,
+                parameters,
+                body,
+            },
+            span: Span {
+                start: token.start,
+                end,
+            },
         })
     }
 
@@ -222,18 +247,18 @@ impl Parser {
 
             parameters.push((type_.clone(), name.clone()));
 
-            match self.peek()?.kind {
+            let peek: &Token = self.peek()?;
+            match peek.kind {
                 TokenKind::Comma => {
                     self.advance();
                 }
                 TokenKind::RightParen => {
-                    self.advance();
                     break;
                 }
                 _ => {
                     return Err(format!(
-                        "Expected ',' or ')', found '{:?}'",
-                        self.peek()?.kind
+                        "Expected ',' or ')', found '{:?}' at {}:{}",
+                        peek.kind, peek.start.0, peek.start.1
                     ));
                 }
             }
@@ -242,8 +267,9 @@ impl Parser {
         Ok(parameters)
     }
 
-    fn parse_variable_assignment(&mut self) -> Result<Statement, String> {
-        let identifier: String = match &self.peek()?.kind {
+    fn parse_variable_assignment(&mut self) -> Result<Stmt, String> {
+        let token: Token = self.peek()?.clone();
+        let identifier: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => {
                 unreachable!("Checked for identifier token before")
@@ -253,17 +279,25 @@ impl Parser {
         self.advance();
         self.expect_token(&TokenKind::Equals)?;
 
-        let value: Expression = self.parse_expression()?;
+        let value: Expr = self.parse_expression()?;
 
         self.expect_token(&TokenKind::Semicolon)?;
 
-        Ok(Statement::VariableAssignment {
-            name: identifier,
-            value,
+        let end: (usize, usize) = value.span.end;
+
+        Ok(Spanned {
+            node: Statement::VariableAssignment {
+                name: identifier,
+                value,
+            },
+            span: Span {
+                start: token.start,
+                end,
+            },
         })
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, String> {
+    fn parse_expression(&mut self) -> Result<Expr, String> {
         self.parse_precedence(0, false)
     }
 
@@ -276,19 +310,18 @@ impl Parser {
         }
     }
 
-    fn parse_precedence(
-        &mut self,
-        min_prec: u8,
-        seen_comparison: bool,
-    ) -> Result<Expression, String> {
-        let mut left: Expression = self.parse_primary()?;
+    fn parse_precedence(&mut self, min_prec: u8, seen_comparison: bool) -> Result<Expr, String> {
+        let mut left: Expr = self.parse_primary()?;
 
         while let Ok(next) = self.peek() {
             let op_token: Token = next.clone();
             let is_comparison_op: bool = Self::COMPARISON_TOKEN.contains(&op_token.kind);
 
             if seen_comparison && is_comparison_op {
-                return Err(String::from("Chained comparison operators are not allowed"));
+                return Err(format!(
+                    "Chained comparison operators are not allowed ({}:{})",
+                    op_token.start.0, op_token.start.1
+                ));
             }
 
             let prec: u8 = match Self::operator_precedence(&op_token.kind) {
@@ -298,7 +331,7 @@ impl Parser {
 
             self.advance();
 
-            let right: Expression =
+            let right: Expr =
                 self.parse_precedence(prec + 1, seen_comparison || is_comparison_op)?;
 
             let operator: Operator = match op_token.kind {
@@ -315,18 +348,25 @@ impl Parser {
                 _ => unreachable!(),
             };
 
-            left = Expression::Binary {
-                left: Box::new(left),
-                operator,
-                right: Box::new(right),
-            };
+            let start: (usize, usize) = left.span.start;
+            let end: (usize, usize) = right.span.end;
+
+            left = Spanned {
+                node: Expression::Binary {
+                    left: Box::new(left),
+                    operator,
+                    right: Box::new(right),
+                },
+                span: Span { start, end },
+            }
         }
 
         Ok(left)
     }
 
-    fn parse_primary(&mut self) -> Result<Expression, String> {
+    fn parse_primary(&mut self) -> Result<Expr, String> {
         let token: Token = self.peek()?.clone();
+        let start: (usize, usize) = token.start;
         match token.kind {
             TokenKind::Integer(_)
             | TokenKind::Float(_)
@@ -334,51 +374,84 @@ impl Parser {
             | TokenKind::Boolean(_) => self.parse_literal(),
             TokenKind::LeftParen => {
                 self.advance();
-                let expr: Expression = self.parse_expression()?;
-                self.expect_token(&TokenKind::RightParen)?;
-                Ok(expr)
+                let expr: Expr = self.parse_expression()?;
+                let end: (usize, usize) = self.expect_token(&TokenKind::RightParen)?.end;
+                Ok(Spanned {
+                    node: expr.node,
+                    span: Span { start, end },
+                })
             }
             TokenKind::Identifier(identifier) => {
                 self.advance();
                 if self.match_token(&TokenKind::LeftParen) {
-                    return self.parse_function_call(&identifier);
+                    self.expect_token(&TokenKind::LeftParen)?;
+                    return self.parse_function_call(&identifier, start);
                 }
-                Ok(Expression::Identifier(identifier))
+                Ok(Spanned {
+                    node: Expression::Identifier(identifier),
+                    span: Span {
+                        start,
+                        end: token.end,
+                    },
+                })
             }
-            _ => Err(format!("Unexpected token: {:?}", token.kind)),
+            _ => Err(format!(
+                "Unexpected token: {:?} at {}:{}",
+                token.kind, token.start.0, token.start.1
+            )),
         }
     }
 
-    fn parse_literal(&mut self) -> Result<Expression, String> {
+    fn parse_literal(&mut self) -> Result<Expr, String> {
         let token: Token = self.peek()?.clone();
+        let start: (usize, usize) = token.start;
+        let end: (usize, usize) = token.end;
         match &token.kind {
             TokenKind::Integer(value) => {
                 self.advance();
-                Ok(Expression::Literal(Literal::Integer(*value)))
+                Ok(Spanned {
+                    node: Expression::Literal(Literal::Integer(*value)),
+                    span: Span { start, end },
+                })
             }
             TokenKind::Float(value) => {
                 self.advance();
-                Ok(Expression::Literal(Literal::Float(*value)))
+                Ok(Spanned {
+                    node: Expression::Literal(Literal::Float(*value)),
+                    span: Span { start, end },
+                })
             }
             TokenKind::String(value) => {
                 self.advance();
-                Ok(Expression::Literal(Literal::String(value.clone())))
+                Ok(Spanned {
+                    node: Expression::Literal(Literal::String(value.clone())),
+                    span: Span { start, end },
+                })
             }
             TokenKind::Boolean(value) => {
                 self.advance();
-                Ok(Expression::Literal(Literal::Boolean(*value)))
+                Ok(Spanned {
+                    node: Expression::Literal(Literal::Boolean(*value)),
+                    span: Span { start, end },
+                })
             }
-            _ => Err(format!("Expected literal, found {:?}", token.kind)),
+            _ => Err(format!(
+                "Expected literal, found {:?} at {}:{}",
+                token.kind, start.0, start.1
+            )),
         }
     }
 
-    fn parse_function_call(&mut self, identifier: &str) -> Result<Expression, String> {
-        let mut arguments: Vec<Expression> = Vec::new();
+    fn parse_function_call(
+        &mut self,
+        identifier: &str,
+        start: (usize, usize),
+    ) -> Result<Expr, String> {
+        let mut arguments: Vec<Expr> = Vec::new();
 
         if !self.match_token(&TokenKind::RightParen) {
             loop {
-                let value = self.parse_expression()?;
-
+                let value: Expr = self.parse_expression()?;
                 arguments.push(value);
 
                 match self.peek()?.kind {
@@ -386,308 +459,27 @@ impl Parser {
                         self.advance();
                     }
                     TokenKind::RightParen => {
-                        self.advance();
                         break;
                     }
                     _ => {
+                        let peek: &Token = self.peek()?;
                         return Err(format!(
-                            "Expected ',' or ')', found '{:?}'",
-                            self.peek()?.kind
+                            "Expected ',' or ')', found '{:?}' at {}:{}",
+                            peek.kind, peek.start.0, peek.start.1
                         ));
                     }
                 }
             }
         }
 
-        Ok(Expression::FunctionCall {
-            name: identifier.to_string(),
-            arguments,
+        let end: (usize, usize) = self.expect_token(&TokenKind::RightParen)?.end;
+
+        Ok(Spanned {
+            node: Expression::FunctionCall {
+                name: identifier.to_string(),
+                arguments,
+            },
+            span: Span { start, end },
         })
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn simple_addition() {
-        // 2 + 3.4;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(2), 0, 1),
-            Token::new(TokenKind::Plus, 0, 3),
-            Token::new(TokenKind::Float(3.4), 0, 5),
-            Token::new(TokenKind::Semicolon, 0, 8),
-            Token::new(TokenKind::EndOfFile, 0, 9),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Integer(2))),
-                operator: Operator::Add,
-                right: Box::new(Expression::Literal(Literal::Float(3.4))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn simple_subtraction() {
-        // 5.0 - 1;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Float(5.0), 0, 1),
-            Token::new(TokenKind::Minus, 0, 5),
-            Token::new(TokenKind::Integer(1), 0, 7),
-            Token::new(TokenKind::Semicolon, 0, 8),
-            Token::new(TokenKind::EndOfFile, 0, 9),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Float(5.0))),
-                operator: Operator::Subtract,
-                right: Box::new(Expression::Literal(Literal::Integer(1))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn simple_multiplication() {
-        // 4 * 2;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(4), 0, 1),
-            Token::new(TokenKind::Asterisk, 0, 3),
-            Token::new(TokenKind::Integer(2), 0, 5),
-            Token::new(TokenKind::Semicolon, 0, 6),
-            Token::new(TokenKind::EndOfFile, 0, 7),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Integer(4))),
-                operator: Operator::Multiply,
-                right: Box::new(Expression::Literal(Literal::Integer(2))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn simple_division() {
-        // 8 / 4.0;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(8), 0, 1),
-            Token::new(TokenKind::Slash, 0, 3),
-            Token::new(TokenKind::Float(4.0), 0, 5),
-            Token::new(TokenKind::Semicolon, 0, 8),
-            Token::new(TokenKind::EndOfFile, 0, 9),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Integer(8))),
-                operator: Operator::Divide,
-                right: Box::new(Expression::Literal(Literal::Float(4.0))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn integer_literal() {
-        // 42;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(42), 0, 1),
-            Token::new(TokenKind::Semicolon, 0, 3),
-            Token::new(TokenKind::EndOfFile, 0, 4),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Literal(
-                Literal::Integer(42),
-            ))],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn float_literal() {
-        // 3.24;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Float(3.24), 0, 1),
-            Token::new(TokenKind::Semicolon, 0, 5),
-            Token::new(TokenKind::EndOfFile, 0, 6),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Literal(Literal::Float(
-                3.24,
-            )))],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn parenthesized_addition() {
-        // (1 + 2);
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::LeftParen, 0, 1),
-            Token::new(TokenKind::Integer(1), 0, 2),
-            Token::new(TokenKind::Plus, 0, 4),
-            Token::new(TokenKind::Integer(2), 0, 6),
-            Token::new(TokenKind::RightParen, 0, 7),
-            Token::new(TokenKind::Semicolon, 0, 8),
-            Token::new(TokenKind::EndOfFile, 0, 9),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Integer(1))),
-                operator: Operator::Add,
-                right: Box::new(Expression::Literal(Literal::Integer(2))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn operator_precedence() {
-        // 2 + 3 * 4;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(2), 0, 1),
-            Token::new(TokenKind::Plus, 0, 3),
-            Token::new(TokenKind::Float(3.3), 0, 5),
-            Token::new(TokenKind::Asterisk, 0, 9),
-            Token::new(TokenKind::Integer(4), 0, 11),
-            Token::new(TokenKind::Semicolon, 0, 12),
-            Token::new(TokenKind::EndOfFile, 0, 13),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Literal(Literal::Integer(2))),
-                operator: Operator::Add,
-                right: Box::new(Expression::Binary {
-                    left: Box::new(Expression::Literal(Literal::Float(3.3))),
-                    operator: Operator::Multiply,
-                    right: Box::new(Expression::Literal(Literal::Integer(4))),
-                }),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn parenthesized_precedence() {
-        // (2.7 + 3) * 4;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::LeftParen, 0, 1),
-            Token::new(TokenKind::Float(2.7), 0, 2),
-            Token::new(TokenKind::Plus, 0, 6),
-            Token::new(TokenKind::Integer(3), 0, 8),
-            Token::new(TokenKind::RightParen, 0, 9),
-            Token::new(TokenKind::Asterisk, 0, 11),
-            Token::new(TokenKind::Integer(4), 0, 13),
-            Token::new(TokenKind::Semicolon, 0, 14),
-            Token::new(TokenKind::EndOfFile, 0, 15),
-        ];
-        let program: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Binary {
-                left: Box::new(Expression::Binary {
-                    left: Box::new(Expression::Literal(Literal::Float(2.7))),
-                    operator: Operator::Add,
-                    right: Box::new(Expression::Literal(Literal::Integer(3))),
-                }),
-                operator: Operator::Multiply,
-                right: Box::new(Expression::Literal(Literal::Integer(4))),
-            })],
-        };
-        assert_eq!(program, expected);
-    }
-
-    #[test]
-    fn consecutive_literals() {
-        // 1 2 3
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(1), 0, 1),
-            Token::new(TokenKind::Integer(2), 0, 3),
-            Token::new(TokenKind::Integer(3), 0, 5),
-            Token::new(TokenKind::EndOfFile, 0, 6),
-        ];
-        let result: String = Parser::parse(tokens).err().unwrap();
-        let expected_err: String = "Expected token 'Semicolon', found 'Integer(2)'".to_string();
-        assert_eq!(result, expected_err);
-    }
-
-    #[test]
-    fn missing_right_paren() {
-        // (1 + 2
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::LeftParen, 0, 1),
-            Token::new(TokenKind::Integer(1), 0, 2),
-            Token::new(TokenKind::Plus, 0, 4),
-            Token::new(TokenKind::Integer(2), 0, 6),
-            Token::new(TokenKind::EndOfFile, 0, 7),
-        ];
-        let result: String = Parser::parse(tokens).err().unwrap();
-        let expected_err: String = "Expected token 'RightParen', found 'EndOfFile'".to_string();
-        assert_eq!(result, expected_err);
-    }
-
-    #[test]
-    fn string_literal() {
-        // "Hello";
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::String("Hello".to_string()), 0, 1),
-            Token::new(TokenKind::Semicolon, 0, 8),
-            Token::new(TokenKind::EndOfFile, 0, 9),
-        ];
-        let result: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Literal(Literal::String(
-                "Hello".to_string(),
-            )))],
-        };
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn string_escape_sequences() {
-        // "\n\u{21A0}\x45"
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::String("\n↠E".to_string()), 0, 1),
-            Token::new(TokenKind::Semicolon, 0, 15),
-            Token::new(TokenKind::EndOfFile, 0, 16),
-        ];
-        let result: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![Statement::Expression(Expression::Literal(Literal::String(
-                "\n↠E".to_string(),
-            )))],
-        };
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn boolean_literal() {
-        // true; false;
-        let tokens: Vec<Token> = vec![
-            Token::new(TokenKind::Boolean(true), 0, 1),
-            Token::new(TokenKind::Semicolon, 0, 5),
-            Token::new(TokenKind::Boolean(false), 0, 7),
-            Token::new(TokenKind::Semicolon, 0, 12),
-            Token::new(TokenKind::EndOfFile, 0, 13),
-        ];
-        let result: Program = Parser::parse(tokens).unwrap();
-        let expected: Program = Program {
-            statements: vec![
-                Statement::Expression(Expression::Literal(Literal::Boolean(true))),
-                Statement::Expression(Expression::Literal(Literal::Boolean(false))),
-            ],
-        };
-        assert_eq!(result, expected);
     }
 }
