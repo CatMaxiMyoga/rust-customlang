@@ -57,15 +57,20 @@ impl Lexer {
             ));
         }
 
-        tokens.push(Token::new(TokenKind::EndOfFile, lexer.line, lexer.column));
+        tokens.push(Token::single(
+            TokenKind::EndOfFile,
+            lexer.line,
+            lexer.column,
+        ));
 
         Ok(tokens)
     }
 
     fn multiple_char_token(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
         let current_char: char = self.source[self.index];
+        let start_loc: (usize, usize) = (self.line, self.column);
 
-        let double: Option<TokenKind>;
+        let mut double: Option<TokenKind> = None;
         if let Some(next_char) = self.source.get(self.index + 1) {
             let double_string: String = format!("{}{}", current_char, *next_char);
             let double_str: &str = double_string.as_str();
@@ -77,14 +82,12 @@ impl Lexer {
                 "!=" => Some(TokenKind::NotEquals),
                 _ => None,
             }
-        } else {
-            return Ok(false);
         }
 
         if let Some(kind) = double {
-            tokens.push(Token::new(kind, self.line, self.column));
             self.index += 2;
             self.column += 2;
+            tokens.push(Token::new(kind, start_loc, (self.line, self.column)));
             return Ok(true);
         }
 
@@ -112,7 +115,7 @@ impl Lexer {
         };
 
         if let Some(kind) = single {
-            tokens.push(Token::new(kind, self.line, self.column));
+            tokens.push(Token::single(kind, self.line, self.column));
             self.index += 1;
             self.column += 1;
             return true;
@@ -123,7 +126,7 @@ impl Lexer {
     fn number(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
         let mut number_vec: Vec<char> = vec![];
         let mut dot_seen: bool = false;
-        let number_start_loc: (usize, usize) = (self.line, self.column);
+        let start_loc: (usize, usize) = (self.line, self.column);
         while self.index < self.source.len()
             && (self.source[self.index].is_numeric() || self.source[self.index] == '.')
         {
@@ -150,8 +153,8 @@ impl Lexer {
         if !number_vec.is_empty() {
             if number_vec.last().expect("Checked non-empty") == &'.' {
                 return Err(format!(
-                    "Invalid Number Format at {}:{}",
-                    number_start_loc.0, number_start_loc.1
+                    "Invalid Number Format at {}:{} - {}:{} (Trailing '.')",
+                    start_loc.0, start_loc.1, self.line, self.column
                 ));
             }
 
@@ -161,25 +164,25 @@ impl Lexer {
                 let float_value: f64 = number_str.parse().map_err(|_| {
                     format!(
                         "Failed to parse float '{}' at {}:{}",
-                        number_str, number_start_loc.0, number_start_loc.1
+                        number_str, start_loc.0, start_loc.1
                     )
                 })?;
                 tokens.push(Token::new(
                     TokenKind::Float(float_value),
-                    number_start_loc.0,
-                    number_start_loc.1,
+                    start_loc,
+                    (self.line, self.column),
                 ));
             } else {
                 let int_value: i64 = number_str.parse().map_err(|_| {
                     format!(
                         "Failed to parse integer '{}' at {}:{}",
-                        number_str, number_start_loc.0, number_start_loc.1
+                        number_str, start_loc.0, start_loc.1
                     )
                 })?;
                 tokens.push(Token::new(
                     TokenKind::Integer(int_value),
-                    number_start_loc.0,
-                    number_start_loc.1,
+                    start_loc,
+                    (self.line, self.column),
                 ));
             }
 
@@ -191,7 +194,7 @@ impl Lexer {
 
     fn identifier(&mut self, tokens: &mut Vec<Token>) -> bool {
         let mut identifier_vec: Vec<char> = vec![];
-        let identifier_start_loc: (usize, usize) = (self.line, self.column);
+        let start_loc: (usize, usize) = (self.line, self.column);
         while self.index < self.source.len()
             && (self.source[self.index].is_alphanumeric() || self.source[self.index] == '_')
         {
@@ -209,11 +212,7 @@ impl Lexer {
                 identifier => TokenKind::Identifier(String::from(identifier)),
             };
 
-            tokens.push(Token::new(
-                kind,
-                identifier_start_loc.0,
-                identifier_start_loc.1,
-            ));
+            tokens.push(Token::new(kind, start_loc, (self.line, self.column)));
 
             return true;
         }
@@ -226,7 +225,7 @@ impl Lexer {
             return Ok(false);
         }
 
-        let string_start_loc: (usize, usize) = (self.line, self.column);
+        let start_loc: (usize, usize) = (self.line, self.column);
         self.index += 1;
         self.column += 1;
 
@@ -264,7 +263,7 @@ impl Lexer {
         if self.index >= self.source.len() {
             return Err(format!(
                 "Unterminated string starting at {}:{}",
-                string_start_loc.0, string_start_loc.1
+                start_loc.0, start_loc.1
             ));
         }
 
@@ -273,8 +272,8 @@ impl Lexer {
 
         tokens.push(Token::new(
             TokenKind::String(string_vec.iter().collect()),
-            string_start_loc.0,
-            string_start_loc.1,
+            start_loc,
+            (self.line, self.column),
         ));
 
         Ok(true)
@@ -368,9 +367,9 @@ mod lexer_tests {
     fn simple_integer() {
         let result: Vec<Token> = Lexer::tokenize("45;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(45), 1, 1),
-            Token::new(TokenKind::Semicolon, 1, 3),
-            Token::new(TokenKind::EndOfFile, 1, 4),
+            Token::new(TokenKind::Integer(45), (1, 1), (1, 3)),
+            Token::single(TokenKind::Semicolon, 1, 3),
+            Token::single(TokenKind::EndOfFile, 1, 4),
         ];
 
         assert_eq!(result, expected);
@@ -380,9 +379,9 @@ mod lexer_tests {
     fn simple_float() {
         let result: Vec<Token> = Lexer::tokenize("1.2345;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Float(1.2345), 1, 1),
-            Token::new(TokenKind::Semicolon, 1, 7),
-            Token::new(TokenKind::EndOfFile, 1, 8),
+            Token::new(TokenKind::Float(1.2345), (1, 1), (1, 7)),
+            Token::single(TokenKind::Semicolon, 1, 7),
+            Token::single(TokenKind::EndOfFile, 1, 8),
         ];
         assert_eq!(result, expected);
     }
@@ -391,9 +390,9 @@ mod lexer_tests {
     fn dot_starting_float() {
         let result: Vec<Token> = Lexer::tokenize(".5678;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Float(0.5678), 1, 1),
-            Token::new(TokenKind::Semicolon, 1, 6),
-            Token::new(TokenKind::EndOfFile, 1, 7),
+            Token::new(TokenKind::Float(0.5678), (1, 1), (1, 6)),
+            Token::single(TokenKind::Semicolon, 1, 6),
+            Token::single(TokenKind::EndOfFile, 1, 7),
         ];
         assert_eq!(result, expected);
     }
@@ -402,13 +401,13 @@ mod lexer_tests {
     fn multiple_integers() {
         let result: Vec<Token> = Lexer::tokenize("12; 34; 56;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(12), 1, 1),
-            Token::new(TokenKind::Semicolon, 1, 3),
-            Token::new(TokenKind::Integer(34), 1, 5),
-            Token::new(TokenKind::Semicolon, 1, 7),
-            Token::new(TokenKind::Integer(56), 1, 9),
-            Token::new(TokenKind::Semicolon, 1, 11),
-            Token::new(TokenKind::EndOfFile, 1, 12),
+            Token::new(TokenKind::Integer(12), (1, 1), (1, 3)),
+            Token::single(TokenKind::Semicolon, 1, 3),
+            Token::new(TokenKind::Integer(34), (1, 5), (1, 7)),
+            Token::single(TokenKind::Semicolon, 1, 7),
+            Token::new(TokenKind::Integer(56), (1, 9), (1, 11)),
+            Token::single(TokenKind::Semicolon, 1, 11),
+            Token::single(TokenKind::EndOfFile, 1, 12),
         ];
         assert_eq!(result, expected);
     }
@@ -417,28 +416,28 @@ mod lexer_tests {
     fn multiple_floats() {
         let result: Vec<Token> = Lexer::tokenize("1.1; 2.2; 3.3;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Float(1.1), 1, 1),
-            Token::new(TokenKind::Semicolon, 1, 4),
-            Token::new(TokenKind::Float(2.2), 1, 6),
-            Token::new(TokenKind::Semicolon, 1, 9),
-            Token::new(TokenKind::Float(3.3), 1, 11),
-            Token::new(TokenKind::Semicolon, 1, 14),
-            Token::new(TokenKind::EndOfFile, 1, 15),
+            Token::new(TokenKind::Float(1.1), (1, 1), (1, 4)),
+            Token::single(TokenKind::Semicolon, 1, 4),
+            Token::new(TokenKind::Float(2.2), (1, 6), (1, 9)),
+            Token::single(TokenKind::Semicolon, 1, 9),
+            Token::new(TokenKind::Float(3.3), (1, 11), (1, 14)),
+            Token::single(TokenKind::Semicolon, 1, 14),
+            Token::single(TokenKind::EndOfFile, 1, 15),
         ];
         assert_eq!(result, expected);
     }
 
     #[test]
-    fn single_letter_tokens() {
+    fn single_char_tokens() {
         let result: Vec<Token> = Lexer::tokenize("()+-*/").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::LeftParen, 1, 1),
-            Token::new(TokenKind::RightParen, 1, 2),
-            Token::new(TokenKind::Plus, 1, 3),
-            Token::new(TokenKind::Minus, 1, 4),
-            Token::new(TokenKind::Asterisk, 1, 5),
-            Token::new(TokenKind::Slash, 1, 6),
-            Token::new(TokenKind::EndOfFile, 1, 7),
+            Token::single(TokenKind::LeftParen, 1, 1),
+            Token::single(TokenKind::RightParen, 1, 2),
+            Token::single(TokenKind::Plus, 1, 3),
+            Token::single(TokenKind::Minus, 1, 4),
+            Token::single(TokenKind::Asterisk, 1, 5),
+            Token::single(TokenKind::Slash, 1, 6),
+            Token::single(TokenKind::EndOfFile, 1, 7),
         ];
         assert_eq!(result, expected);
     }
@@ -447,9 +446,9 @@ mod lexer_tests {
     fn multiline() {
         let result: Vec<Token> = Lexer::tokenize("314\n159").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(314), 1, 1),
-            Token::new(TokenKind::Integer(159), 2, 1),
-            Token::new(TokenKind::EndOfFile, 2, 4),
+            Token::new(TokenKind::Integer(314), (1, 1), (1, 4)),
+            Token::new(TokenKind::Integer(159), (2, 1), (2, 4)),
+            Token::single(TokenKind::EndOfFile, 2, 4),
         ];
         assert_eq!(result, expected);
     }
@@ -458,10 +457,10 @@ mod lexer_tests {
     fn excessive_whitespace() {
         let result: Vec<Token> = Lexer::tokenize("  7\t\t8  \n  9 ").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(7), 1, 3),
-            Token::new(TokenKind::Integer(8), 1, 6),
-            Token::new(TokenKind::Integer(9), 2, 3),
-            Token::new(TokenKind::EndOfFile, 2, 5),
+            Token::single(TokenKind::Integer(7), 1, 3),
+            Token::single(TokenKind::Integer(8), 1, 6),
+            Token::single(TokenKind::Integer(9), 2, 3),
+            Token::single(TokenKind::EndOfFile, 2, 5),
         ];
         assert_eq!(result, expected);
     }
@@ -470,18 +469,18 @@ mod lexer_tests {
     fn simple_arithmetic_expression() {
         let result: Vec<Token> = Lexer::tokenize("3 + 4.5 * (2 - 1) / 6").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Integer(3), 1, 1),
-            Token::new(TokenKind::Plus, 1, 3),
-            Token::new(TokenKind::Float(4.5), 1, 5),
-            Token::new(TokenKind::Asterisk, 1, 9),
-            Token::new(TokenKind::LeftParen, 1, 11),
-            Token::new(TokenKind::Integer(2), 1, 12),
-            Token::new(TokenKind::Minus, 1, 14),
-            Token::new(TokenKind::Integer(1), 1, 16),
-            Token::new(TokenKind::RightParen, 1, 17),
-            Token::new(TokenKind::Slash, 1, 19),
-            Token::new(TokenKind::Integer(6), 1, 21),
-            Token::new(TokenKind::EndOfFile, 1, 22),
+            Token::single(TokenKind::Integer(3), 1, 1),
+            Token::single(TokenKind::Plus, 1, 3),
+            Token::new(TokenKind::Float(4.5), (1, 5), (1, 8)),
+            Token::single(TokenKind::Asterisk, 1, 9),
+            Token::single(TokenKind::LeftParen, 1, 11),
+            Token::single(TokenKind::Integer(2), 1, 12),
+            Token::single(TokenKind::Minus, 1, 14),
+            Token::single(TokenKind::Integer(1), 1, 16),
+            Token::single(TokenKind::RightParen, 1, 17),
+            Token::single(TokenKind::Slash, 1, 19),
+            Token::single(TokenKind::Integer(6), 1, 21),
+            Token::single(TokenKind::EndOfFile, 1, 22),
         ];
         assert_eq!(result, expected);
     }
@@ -497,8 +496,8 @@ mod lexer_tests {
     fn identifier() {
         let result: Vec<Token> = Lexer::tokenize("Hello").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Identifier(String::from("Hello")), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 6),
+            Token::new(TokenKind::Identifier(String::from("Hello")), (1, 1), (1, 6)),
+            Token::single(TokenKind::EndOfFile, 1, 6),
         ];
         assert_eq!(result, expected);
     }
@@ -507,8 +506,12 @@ mod lexer_tests {
     fn identifier_with_number() {
         let result: Vec<Token> = Lexer::tokenize("var123").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Identifier(String::from("var123")), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 7),
+            Token::new(
+                TokenKind::Identifier(String::from("var123")),
+                (1, 1),
+                (1, 7),
+            ),
+            Token::single(TokenKind::EndOfFile, 1, 7),
         ];
         assert_eq!(result, expected);
     }
@@ -517,12 +520,16 @@ mod lexer_tests {
     fn variable_assignment() {
         let result: Vec<Token> = Lexer::tokenize("Integer x = 10;").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Identifier(String::from("Integer")), 1, 1),
-            Token::new(TokenKind::Identifier(String::from("x")), 1, 9),
-            Token::new(TokenKind::Equals, 1, 11),
-            Token::new(TokenKind::Integer(10), 1, 13),
-            Token::new(TokenKind::Semicolon, 1, 15),
-            Token::new(TokenKind::EndOfFile, 1, 16),
+            Token::new(
+                TokenKind::Identifier(String::from("Integer")),
+                (1, 1),
+                (1, 8),
+            ),
+            Token::single(TokenKind::Identifier(String::from("x")), 1, 9),
+            Token::single(TokenKind::Equals, 1, 11),
+            Token::new(TokenKind::Integer(10), (1, 13), (1, 15)),
+            Token::single(TokenKind::Semicolon, 1, 15),
+            Token::single(TokenKind::EndOfFile, 1, 16),
         ];
         assert_eq!(result, expected);
     }
@@ -531,8 +538,12 @@ mod lexer_tests {
     fn string_literal() {
         let result: Vec<Token> = Lexer::tokenize(r#""Hello, World!""#).unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::String(String::from("Hello, World!")), 1, 1),
-            Token::new(TokenKind::EndOfFile, 1, 16),
+            Token::new(
+                TokenKind::String(String::from("Hello, World!")),
+                (1, 1),
+                (1, 16),
+            ),
+            Token::single(TokenKind::EndOfFile, 1, 16),
         ];
         assert_eq!(result, expected);
     }
@@ -543,10 +554,10 @@ mod lexer_tests {
         let expected: Vec<Token> = vec![
             Token::new(
                 TokenKind::String(String::from("\n\t\r\x08\0\x0C\x0B\x07↠E\\\"")),
-                1,
-                1,
+                (1, 1),
+                (1, 35),
             ),
-            Token::new(TokenKind::EndOfFile, 1, 35),
+            Token::single(TokenKind::EndOfFile, 1, 35),
         ];
         assert_eq!(result, expected);
     }
@@ -555,9 +566,9 @@ mod lexer_tests {
     fn boolean_literals() {
         let result: Vec<Token> = Lexer::tokenize("true false").unwrap();
         let expected: Vec<Token> = vec![
-            Token::new(TokenKind::Boolean(true), 1, 1),
-            Token::new(TokenKind::Boolean(false), 1, 6),
-            Token::new(TokenKind::EndOfFile, 1, 11),
+            Token::new(TokenKind::Boolean(true), (1, 1), (1, 5)),
+            Token::new(TokenKind::Boolean(false), (1, 6), (1, 11)),
+            Token::single(TokenKind::EndOfFile, 1, 11),
         ];
         assert_eq!(result, expected);
     }

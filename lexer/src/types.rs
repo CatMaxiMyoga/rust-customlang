@@ -66,10 +66,10 @@ pub enum TokenKind {
 pub struct Token {
     /// The kind (and potential value) of the token.
     pub kind: TokenKind,
-    /// The line number where the token or the start of the token is located.
-    pub line: usize,
-    /// The column number where the token or the start of the token is located.
-    pub column: usize,
+    /// The start position of the token (line, column).
+    pub start: (usize, usize),
+    /// The end position of the token (line, column).
+    pub end: (usize, usize),
 }
 
 impl Token {
@@ -78,10 +78,26 @@ impl Token {
     /// # Arguments
     ///
     /// * `kind` - The kind of the token.
+    /// * `start` - The starting position of the token (line, column).
+    /// * `end` - The ending position of the token (line, column).
+    #[must_use]
+    pub const fn new(kind: TokenKind, start: (usize, usize), end: (usize, usize)) -> Self {
+        Self { kind, start, end: (end.0, end.1 - 1) }
+    }
+
+    /// Creates a new token that spans a single character at the specified line and column.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - The kind of the token.
     /// * `line` - The line number where the token is located.
     /// * `column` - The column number where the token is located.
     #[must_use]
-    pub const fn new(kind: TokenKind, line: usize, column: usize) -> Self {
-        Self { kind, line, column }
+    pub const fn single(kind: TokenKind, line: usize, column: usize) -> Self {
+        Self {
+            kind,
+            start: (line, column),
+            end: (line, column),
+        }
     }
 }
