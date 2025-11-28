@@ -185,7 +185,7 @@ pub enum RuntimeValue {
         /// The parameter names of the function.
         parameters: Vec<(Type, ParamName)>,
         /// The body of the function as a list of statements.
-        body: Vec<parser::types::Statement>,
+        body: Vec<parser::types::Stmt>,
     },
     /// A builtin function value.
     BuiltinFunction {
