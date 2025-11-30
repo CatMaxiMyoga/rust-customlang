@@ -2,10 +2,7 @@
 
 use std::path::Path;
 
-use interpreter::{
-    Interpreter,
-    types::{RuntimeError, Scope},
-};
+use compiler::Compiler;
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
 
@@ -28,11 +25,11 @@ fn main() {
 
     if let Some(extension) = filepath.extension() {
         if extension != LANGUAGE_EXTENSION {
-            eprintln!("Invalid file extension. Expected a .cl file.");
+            eprintln!("Invalid file extension. Expected a .{LANGUAGE_EXTENSION} file.");
             std::process::exit(1);
         }
     } else {
-        eprintln!("Unable to read file extension. Expected a .cl file.");
+        eprintln!("Unable to read file extension. Expected a .{LANGUAGE_EXTENSION} file.");
         std::process::exit(1);
     }
 
@@ -59,11 +56,8 @@ fn main() {
         }
     };
 
-    let mut environment: Scope = Scope::default();
-
-    let runtime_result: Result<(), RuntimeError> = Interpreter::run(program, &mut environment);
-    if let Err(e) = runtime_result {
-        eprintln!("RuntimeError: {e:?}");
+    if let Err(err) = Compiler::compile(program) {
+        eprintln!("Compiler error: {err}");
         std::process::exit(1);
     }
 }
