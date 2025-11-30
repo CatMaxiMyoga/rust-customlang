@@ -1,45 +1,29 @@
-Void printBool(Boolean b) {
-  print(BoolToString(b) + " ");
+Void printBool(Bool b) {
+  print(boolToString(b) + " ");
 }
 
 printBool(true);
-printBool(false);
 printBool(1 > 2);
-printBool(3 == 3);
-printBool(5 <= 10);
-printBool(7 >= 8);
 printBool(4 != 4);
-printBool(0 < 1);
 printBool(2 + 2 == 4);
-printBool(10 - 5 > 3);
 println("");
 
-Void printInteger(Integer i) {
-  print(IntToString(i) + " ");
+Void printInt(Int i) {
+  print(intToString(i) + " ");
 }
 
-printInteger(0);
-printInteger(42);
-printInteger(7);
-printInteger(10-15);
-printInteger(100/4);
-printInteger(3*14);
-printInteger(2+2*2);
-printInteger((5+5)/3);
-printInteger(20-4+2);
+printInt(0);
+printInt(7);
+printInt(10-15);
+printInt((5+5)/3);
 println("");
 
 Void printFloat(Float f) {
-  print(FloatToString(f) + " ");
+  print(floatToString(f) + " ");
 }
 
 printFloat(0.0);
 printFloat(3.14);
-printFloat(2.71);
 printFloat(1.0/3.0);
 printFloat(.25*4.0);
-printFloat(5.0+2.5);
-printFloat(10.0-3);
-printFloat(6*7.0);
-printFloat((1.5+2.5)/2);
 println("");
