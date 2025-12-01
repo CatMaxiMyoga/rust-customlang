@@ -5,6 +5,10 @@
 pub enum Keyword {
     /// Return keyword, used for returning values from functions.
     Return,
+    /// If keyword, used for conditional branching.
+    If,
+    /// Else keyword, used for alternative branching.
+    Else,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
