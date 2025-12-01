@@ -306,9 +306,11 @@ impl Parser {
 
     fn operator_precedence(kind: &TokenKind) -> Option<u8> {
         match kind {
-            TokenKind::Asterisk | TokenKind::Slash => Some(3),
-            TokenKind::Plus | TokenKind::Minus => Some(2),
-            _ if Self::COMPARISON_TOKEN.contains(kind) => Some(1),
+            TokenKind::Asterisk | TokenKind::Slash => Some(5),
+            TokenKind::Plus | TokenKind::Minus => Some(4),
+            _ if Self::COMPARISON_TOKEN.contains(kind) => Some(3),
+            TokenKind::And => Some(2),
+            TokenKind::Or => Some(1),
             _ => None,
         }
     }
