@@ -1,3 +1,5 @@
+println("Hi there!");
+
 Void printBool(Bool b) {
   print(boolToString(b) + " ");
 }
@@ -31,4 +33,5 @@ println("");
 printBool(true || false && false);
 printBool(!true);
 printBool(true && !false);
+printBool((true || false) && false);
 println("");

@@ -102,7 +102,13 @@ impl Compiler {
     ///
     /// # Errors
     /// If compilation fails, returns a `String` describing the error.
-    pub fn compile(program: Program, transpile_only: bool) -> CompilerResult {
+    pub fn compile(
+        program: Program,
+        out_file: &str,
+        transpile_only: bool,
+        gcc_args: &str,
+        clean_up: bool,
+    ) -> CompilerResult {
         let mut compiler: Self = Self {
             output: String::from(MAIN_HEADER),
             ..Default::default()
@@ -115,6 +121,14 @@ impl Compiler {
         compiler.output.push_str("  return 0;\n}\n\n");
 
         fs::create_dir_all("out").map_err(|_| String::from("Unable to create out/ directory"))?;
+
+        if clean_up {
+            Command::new("sh")
+                .arg("-c")
+                .arg("rm out/* 2>/dev/null")
+                .status()
+                .ok();
+        }
 
         let mut main_file: File = File::create("out/rustmm_user_code.c")
             .map_err(|_| String::from("Unable to create c main file."))?;
@@ -188,14 +202,25 @@ impl Compiler {
             return Ok(());
         }
 
+        let out_arg: String = match out_file {
+            "" => String::new(),
+            x => format!(r#"-o "{x}""#),
+        };
+
         let status: ExitStatus = Command::new("sh")
             .arg("-c")
-            .arg("gcc out/*.c -o out/output")
+            .arg(format!(
+                "cd ~/dev/rust-customlang/out && gcc ./*.c {out_arg} {gcc_args}"
+            ))
             .status()
             .map_err(|_| String::from("GCC compilation failed"))?;
 
         if status.success() {
-            println!("Output binary is at out/output");
+            if out_arg.is_empty() {
+                println!("Output is in out/");
+            } else {
+                println!("Output binary is at out/{out_file}");
+            }
         } else {
             return Err(String::from("GCC compilation failed"));
         }
