@@ -53,6 +53,12 @@ pub enum TokenKind {
     EqualsEquals,
     /// !=
     NotEquals,
+    /// ||
+    Or,
+    /// &&
+    And,
+    /// !
+    Exclamation,
     /// Represents an identifier.
     Identifier(String),
     /// Represents a keyword.

@@ -13,9 +13,9 @@ pub enum Literal {
     Boolean(bool),
 }
 
-/// Represents operators.
+/// Represents binary operators.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Operator {
+pub enum BinaryOperator {
     /// Represents binary addition.
     Add,
     /// Represents binary subtraction.
@@ -36,6 +36,17 @@ pub enum Operator {
     LessThanOrEqual,
     /// Represents greater than or equal comparison.
     GreaterThanOrEqual,
+    /// Represents logical AND operation.
+    And,
+    /// Represents logical OR operation.
+    Or,
+}
+
+/// Represents unary operators.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnaryOperator {
+    /// Represents logical NOT operation.
+    Not,
 }
 
 /// Represents expressions in the AST.
@@ -50,9 +61,16 @@ pub enum Expression {
         /// The left-hand side expression.
         left: Box<Expr>,
         /// The operator.
-        operator: Operator,
+        operator: BinaryOperator,
         /// The right-hand side expression.
         right: Box<Expr>,
+    },
+    /// A unary expression.
+    Unary {
+        /// The operator.
+        operator: UnaryOperator,
+        /// The operand expression.
+        operand: Box<Expr>,
     },
     /// A function call expression.
     FunctionCall {

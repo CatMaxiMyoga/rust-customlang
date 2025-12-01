@@ -7,7 +7,9 @@ use std::{
     process::{Command, ExitStatus},
 };
 
-use parser::types::{Expr, Expression, Literal, Operator, Program, Statement, Stmt};
+use parser::types::{
+    BinaryOperator, Expr, Expression, Literal, Program, Statement, Stmt, UnaryOperator,
+};
 
 use crate::types::{BuiltinFunction, CompilerResult, Functions, Type, prefix};
 mod types;
@@ -100,7 +102,7 @@ impl Compiler {
     ///
     /// # Errors
     /// If compilation fails, returns a `String` describing the error.
-    pub fn compile(program: Program) -> CompilerResult {
+    pub fn compile(program: Program, transpile_only: bool) -> CompilerResult {
         let mut compiler: Self = Self {
             output: String::from(MAIN_HEADER),
             ..Default::default()
@@ -179,6 +181,11 @@ impl Compiler {
 
         if !status.success() {
             return Err(String::from("Failed to copy runtime files"));
+        }
+
+        if transpile_only {
+            println!("Transpiled C code is in out/");
+            return Ok(());
         }
 
         let status: ExitStatus = Command::new("sh")
@@ -411,6 +418,7 @@ impl Compiler {
                 operator,
                 right,
             } => self.binary_expr(left, &operator, right),
+            Expression::Unary { operator, operand } => self.unary_expr(&operator, operand),
             Expression::Identifier(identifier) => {
                 self.output.push_str(&prefix(&identifier));
                 self.environment
@@ -448,7 +456,7 @@ impl Compiler {
     fn binary_expr(
         &mut self,
         left: Box<Expr>,
-        operator: &Operator,
+        operator: &BinaryOperator,
         right: Box<Expr>,
     ) -> Result<Type, String> {
         type OpResult = (&'static str, fn(&Type, &Type) -> Result<Type, String>);
@@ -472,9 +480,28 @@ impl Compiler {
         let right: String = binary_compiler.output.clone();
         binary_compiler.output.clear();
 
+        {
+            use BinaryOperator::{And, Or};
+            match operator {
+                Or => {
+                    let operation: String = format!("({left} || {right})");
+                    self.output.push_str(&operation);
+                    return Type::or(&left_type, &right_type);
+                }
+                And => {
+                    let operation: String = format!("({left} && {right})");
+                    self.output.push_str(&operation);
+                    return Type::and(&left_type, &right_type);
+                }
+                _ => {}
+            }
+        }
+
         let op_result: OpResult = {
-            #[allow(clippy::enum_glob_use)]
-            use Operator::*;
+            use BinaryOperator::{
+                Add, Divide, Equals, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual,
+                Multiply, NotEquals, Subtract,
+            };
             match operator {
                 Add => ("add", Type::add),
                 Subtract => ("sub", Type::sub),
@@ -486,6 +513,7 @@ impl Compiler {
                 LessThan => ("lt", Type::lt),
                 GreaterThanOrEqual => ("ge", Type::ge),
                 LessThanOrEqual => ("le", Type::le),
+                _ => unreachable!(),
             }
         };
         let func_op: &'static str = op_result.0;
@@ -531,11 +559,40 @@ impl Compiler {
         Ok(result_type)
     }
 
-    fn binary_part_expr(
-        &self,
-        expr: &Expr,
-        binary_compiler: &mut Self,
-    ) -> Result<(Type, bool), String> {
+    fn unary_expr(&mut self, operator: &UnaryOperator, operand: Box<Expr>) -> Result<Type, String> {
+        type OpResult = (&'static str, fn(&Type) -> Result<Type, String>);
+        let result: OpResult = {
+            use UnaryOperator::Not;
+            match operator {
+                Not => ("-!", Type::not),
+            }
+        };
+
+        let mut unary_compiler: Self = Self::default();
+
+        let (operand_type, handled): (Type, bool) =
+            self.binary_part_expr(&operand, &mut unary_compiler)?;
+        if !handled {
+            unary_compiler.expression(*operand)?;
+        }
+        let operand: String = unary_compiler.output.clone();
+        unary_compiler.output.clear();
+
+        let result_type: Type = result.1(&operand_type)?;
+
+        if result.0.starts_with('-') {
+            let op: &str = &result.0[1..];
+            let operation: String = format!("{op}({operand})");
+            self.output.push_str(&operation);
+            return Ok(result_type);
+        }
+
+        /* Implement function calling logic like in binary_expr here if later needed. */
+
+        Ok(result_type)
+    }
+
+    fn binary_part_expr(&self, expr: &Expr, compiler: &mut Self) -> Result<(Type, bool), String> {
         match expr.node.clone() {
             Expression::Literal(literal) => match literal {
                 Literal::Integer(_) => Ok((Type::Int, false)),
@@ -551,7 +608,10 @@ impl Compiler {
                 left,
                 operator,
                 right,
-            } => Ok((binary_compiler.binary_expr(left, &operator, right)?, true)),
+            } => Ok((compiler.binary_expr(left, &operator, right)?, true)),
+            Expression::Unary { operator, operand } => {
+                Ok((compiler.unary_expr(&operator, operand)?, true))
+            }
             Expression::FunctionCall { name, .. } => {
                 if self.environment.contains_key(&name) {
                     Ok((self.environment[&name].clone(), false))

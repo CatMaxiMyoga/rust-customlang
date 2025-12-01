@@ -80,6 +80,8 @@ impl Lexer {
                 "<=" => Some(TokenKind::LessThanOrEqual),
                 "==" => Some(TokenKind::EqualsEquals),
                 "!=" => Some(TokenKind::NotEquals),
+                "||" => Some(TokenKind::Or),
+                "&&" => Some(TokenKind::And),
                 _ => None,
             }
         }
@@ -111,6 +113,7 @@ impl Lexer {
             ',' => Some(TokenKind::Comma),
             ';' => Some(TokenKind::Semicolon),
             '=' => Some(TokenKind::Equals),
+            '!' => Some(TokenKind::Exclamation),
             _ => None,
         };
 
