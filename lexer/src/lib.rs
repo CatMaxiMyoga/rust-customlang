@@ -113,7 +113,7 @@ impl Lexer {
             ',' => Some(TokenKind::Comma),
             ';' => Some(TokenKind::Semicolon),
             '=' => Some(TokenKind::Equals),
-            '!' => Some(TokenKind::Not),
+            '!' => Some(TokenKind::Exclamation),
             _ => None,
         };
 

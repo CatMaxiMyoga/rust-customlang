@@ -58,7 +58,7 @@ pub enum TokenKind {
     /// &&
     And,
     /// !
-    Not,
+    Exclamation,
     /// Represents an identifier.
     Identifier(String),
     /// Represents a keyword.
