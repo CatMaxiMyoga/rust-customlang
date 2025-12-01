@@ -350,6 +350,8 @@ impl Parser {
                 TokenKind::RightAngle => BinaryOperator::GreaterThan,
                 TokenKind::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
                 TokenKind::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
+                TokenKind::And => BinaryOperator::And,
+                TokenKind::Or => BinaryOperator::Or,
                 _ => unreachable!(),
             };
 
