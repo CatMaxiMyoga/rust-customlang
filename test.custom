@@ -27,3 +27,8 @@ printFloat(3.14);
 printFloat(1.0/3.0);
 printFloat(.25*4.0);
 println("");
+
+printBool(true || false && false);
+printBool(!true);
+printBool(true && !false);
+println("");

@@ -9,12 +9,19 @@ use parser::{Parser, types::Program};
 const LANGUAGE_EXTENSION: &str = "custom";
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
 
-    if args.len() != 1 {
-        eprintln!("Usage: lang <source-file>");
+    if args.is_empty() || args.len() > 2 {
+        eprintln!("Usage: lang [-t] <source-file>");
         std::process::exit(1);
     }
+
+    let transpile_only: bool = if args[0] == "-t" {
+        args.remove(0);
+        true
+    } else {
+        false
+    };
 
     let filename: &str = &args[0];
     let filepath: &Path = Path::new(filename);
@@ -56,7 +63,7 @@ fn main() {
         }
     };
 
-    if let Err(err) = Compiler::compile(program) {
+    if let Err(err) = Compiler::compile(program, transpile_only) {
         eprintln!("Compiler error: {err}");
         std::process::exit(1);
     }
