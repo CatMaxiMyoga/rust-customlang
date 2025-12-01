@@ -127,6 +127,31 @@ impl Type {
     pub fn ge(&self, other: &Self) -> Result<Self, String> {
         self.lt(other)
     }
+
+    /// `&&`
+    pub fn and(&self, other: &Self) -> Result<Self, String> {
+        use Type::Bool;
+        match (self, other) {
+            (Bool, Bool) => Ok(Bool),
+            _ => Err(format!(
+                "Cannot perform logical AND on types {self:?} and {other:?}"
+            )),
+        }
+    }
+
+    /// `||`
+    pub fn or(&self, other: &Self) -> Result<Self, String> {
+        self.and(other)
+    }
+
+    /// `!`
+    pub fn not(&self) -> Result<Self, String> {
+        use Type::Bool;
+        match self {
+            Bool => Ok(Bool),
+            _ => Err(format!("Cannot perform logical NOT on type {self:?}")),
+        }
+    }
 }
 
 pub enum BuiltinFunction {
