@@ -5,7 +5,10 @@ use std::mem::discriminant;
 
 use lexer::types::{Keyword, Token, TokenKind};
 
-use crate::types::{Expr, Expression, Literal, Operator, Program, Span, Spanned, Statement, Stmt};
+use crate::types::{
+    BinaryOperator, Expr, Expression, Literal, Program, Span, Spanned, Statement, Stmt,
+    UnaryOperator,
+};
 
 /// The parser struct responsible for parsing tokens into an AST.
 pub struct Parser {
@@ -311,7 +314,7 @@ impl Parser {
     }
 
     fn parse_precedence(&mut self, min_prec: u8, seen_comparison: bool) -> Result<Expr, String> {
-        let mut left: Expr = self.parse_primary()?;
+        let mut left: Expr = self.parse_unary()?;
 
         while let Ok(next) = self.peek() {
             let op_token: Token = next.clone();
@@ -334,17 +337,17 @@ impl Parser {
             let right: Expr =
                 self.parse_precedence(prec + 1, seen_comparison || is_comparison_op)?;
 
-            let operator: Operator = match op_token.kind {
-                TokenKind::Plus => Operator::Add,
-                TokenKind::Minus => Operator::Subtract,
-                TokenKind::Asterisk => Operator::Multiply,
-                TokenKind::Slash => Operator::Divide,
-                TokenKind::EqualsEquals => Operator::Equals,
-                TokenKind::NotEquals => Operator::NotEquals,
-                TokenKind::LeftAngle => Operator::LessThan,
-                TokenKind::RightAngle => Operator::GreaterThan,
-                TokenKind::LessThanOrEqual => Operator::LessThanOrEqual,
-                TokenKind::GreaterThanOrEqual => Operator::GreaterThanOrEqual,
+            let operator: BinaryOperator = match op_token.kind {
+                TokenKind::Plus => BinaryOperator::Add,
+                TokenKind::Minus => BinaryOperator::Subtract,
+                TokenKind::Asterisk => BinaryOperator::Multiply,
+                TokenKind::Slash => BinaryOperator::Divide,
+                TokenKind::EqualsEquals => BinaryOperator::Equals,
+                TokenKind::NotEquals => BinaryOperator::NotEquals,
+                TokenKind::LeftAngle => BinaryOperator::LessThan,
+                TokenKind::RightAngle => BinaryOperator::GreaterThan,
+                TokenKind::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
+                TokenKind::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
                 _ => unreachable!(),
             };
 
@@ -362,6 +365,35 @@ impl Parser {
         }
 
         Ok(left)
+    }
+
+    fn parse_unary(&mut self) -> Result<Expr, String> {
+        let token: Token = self.peek()?.clone();
+
+        let operator: Option<UnaryOperator> = match token.kind {
+            TokenKind::Exclamation => Some(UnaryOperator::Not),
+            _ => None,
+        };
+
+        let operator: UnaryOperator = match operator {
+            Some(op) => op,
+            None => return self.parse_primary(),
+        };
+
+        self.advance();
+
+        let operand: Expr = self.parse_unary()?;
+
+        let start: (usize, usize) = token.start;
+        let end: (usize, usize) = operand.span.end;
+
+        Ok(Spanned {
+            node: Expression::Unary {
+                operator,
+                operand: Box::new(operand),
+            },
+            span: Span { start, end },
+        })
     }
 
     fn parse_primary(&mut self) -> Result<Expr, String> {
