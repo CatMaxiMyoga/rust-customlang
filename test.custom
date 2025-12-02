@@ -35,3 +35,10 @@ printBool(!true);
 printBool(true && !false);
 printBool((true || false) && false);
 println("");
+
+Bool a = false;
+Bool b = false;
+
+if (a) { print("a"); } else if (b) { print("b"); }
+
+println("");

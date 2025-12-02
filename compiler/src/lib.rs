@@ -290,6 +290,10 @@ impl Compiler {
                     return Ok(());
                 }
             }
+            Statement::If {
+                conditional_branches,
+                else_branch,
+            } => return self.if_stmt(&conditional_branches, else_branch),
             Statement::Return(_) => return Err(String::from("Illegal Return")),
         }
 
@@ -304,6 +308,7 @@ impl Compiler {
 
         let type_: Type = Type::from_str(type_)?;
         self.output.push_str(type_.to_c_type());
+        self.output.push(' ');
         self.output.push_str(&prefix(&name));
         self.output.push_str(" = ");
         if let Some(expr) = value {
@@ -431,6 +436,47 @@ impl Compiler {
         function_output.push_str("}\n\n");
 
         self.functions.insert(pname, (param_types, function_output));
+
+        Ok(())
+    }
+
+    fn if_stmt(
+        &mut self,
+        conditional_branches: &[(Expr, Vec<Stmt>)],
+        else_branch: Option<Vec<Stmt>>,
+    ) -> CompilerResult {
+        self.output.push('\n');
+        self.indent();
+        for (i, (condition, code_block)) in conditional_branches.iter().enumerate() {
+            let output: String = format!("{} (", if i == 0 { "if" } else { "else if" });
+            self.output.push_str(&output);
+            self.expression(condition.clone())?;
+            self.output.push_str(") {\n");
+
+            self.indent_level += 1;
+            for stmt in code_block {
+                self.statement(stmt.clone())?;
+            }
+            self.indent_level -= 1;
+
+            self.indent();
+            self.output.push_str("} ");
+        }
+
+        if let Some(else_block) = else_branch {
+            self.output.push_str("else {\n");
+
+            self.indent_level += 1;
+            for stmt in else_block {
+                self.statement(stmt.clone())?;
+            }
+            self.indent_level -= 1;
+
+            self.indent();
+            self.output.push('}');
+        }
+
+        self.output.push_str("\n\n");
 
         Ok(())
     }
