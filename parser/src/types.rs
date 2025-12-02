@@ -111,6 +111,13 @@ pub enum Statement {
         /// The body of the function.
         body: Vec<Stmt>,
     },
+    /// If statement.
+    If {
+        /// Conditional branches.
+        conditional_branches: Vec<(Expr, Vec<Stmt>)>,
+        /// The block to execute if the condition is false.
+        else_branch: Option<Vec<Stmt>>,
+    },
     /// A return statement.
     Return(Expr),
     /// An expression statement.
