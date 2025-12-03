@@ -9,6 +9,8 @@ pub enum Keyword {
     If,
     /// Else keyword, used for alternative branching.
     Else,
+    /// While keyword, used for looping constructs.
+    While,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
