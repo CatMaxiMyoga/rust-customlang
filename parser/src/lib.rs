@@ -112,7 +112,9 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Stmt, String> {
-        if self.check_next_tokens(&[
+        if self.match_token(&TokenKind::Keyword(Keyword::If)) {
+            self.parse_if_statement()
+        } else if self.check_next_tokens(&[
             TokenKind::Identifier(String::new()),
             TokenKind::Identifier(String::new()),
             TokenKind::Equals,
@@ -149,12 +151,82 @@ impl Parser {
         } else {
             let expr: Expr = self.parse_expression()?;
             let start: (usize, usize) = expr.span.start;
+
             let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
             Ok(Spanned {
                 node: Statement::Expression(expr),
                 span: Span { start, end },
             })
         }
+    }
+
+    fn parse_if_statement(&mut self) -> Result<Stmt, String> {
+        let mut conditional_branches: Vec<(Expr, Vec<Stmt>)> = Vec::new();
+        let mut else_branch: Option<Vec<Stmt>> = None;
+        let if_token: Token = self.expect_token(&TokenKind::Keyword(Keyword::If))?.clone();
+        let start: (usize, usize) = if_token.start;
+        let mut end: (usize, usize);
+
+        loop {
+            let cond_start: (usize, usize) = self.expect_token(&TokenKind::LeftParen)?.start;
+            let condition: Expr = self.parse_expression()?;
+            let cond_end: (usize, usize) = self.expect_token(&TokenKind::RightParen)?.end;
+
+            self.expect_token(&TokenKind::LeftBrace)?;
+            let mut body: Vec<Stmt> = Vec::new();
+            while !self.match_token(&TokenKind::RightBrace) {
+                body.push(self.parse_statement()?);
+            }
+            end = self.expect_token(&TokenKind::RightBrace)?.clone().end;
+
+            conditional_branches.push((
+                Spanned {
+                    node: condition.node,
+                    span: Span {
+                        start: cond_start,
+                        end: cond_end,
+                    },
+                },
+                body,
+            ));
+
+            if !self.match_token(&TokenKind::Keyword(Keyword::Else)) {
+                return Ok(Spanned {
+                    node: Statement::If {
+                        conditional_branches,
+                        else_branch,
+                    },
+                    span: Span { start, end },
+                });
+            }
+
+            if !self.check_next_tokens(&[
+                TokenKind::Keyword(Keyword::Else),
+                TokenKind::Keyword(Keyword::If),
+            ]) {
+                break;
+            }
+
+            self.expect_token(&TokenKind::Keyword(Keyword::Else))?;
+            self.expect_token(&TokenKind::Keyword(Keyword::If))?;
+        }
+
+        self.expect_token(&TokenKind::Keyword(Keyword::Else))?;
+        self.expect_token(&TokenKind::LeftBrace)?;
+        let mut body: Vec<Stmt> = Vec::new();
+        while !self.match_token(&TokenKind::RightBrace) {
+            body.push(self.parse_statement()?);
+        }
+        end = self.expect_token(&TokenKind::RightBrace)?.clone().end;
+        else_branch = Some(body);
+
+        Ok(Spanned {
+            node: Statement::If {
+                conditional_branches,
+                else_branch,
+            },
+            span: Span { start, end },
+        })
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
