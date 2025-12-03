@@ -294,6 +294,7 @@ impl Compiler {
                 conditional_branches,
                 else_branch,
             } => return self.if_stmt(&conditional_branches, else_branch),
+            Statement::While { condition, body } => return self.while_loop_stmt(condition, body),
             Statement::Return(_) => return Err(String::from("Illegal Return")),
         }
 
@@ -358,7 +359,8 @@ impl Compiler {
         function_output.push_str(&pname);
         function_output.push('(');
 
-        self.environment.insert(name.to_owned(), return_type);
+        self.environment
+            .insert(name.to_owned(), return_type.clone());
 
         let mut param_types: Vec<(Type, String)> = Vec::new();
 
@@ -419,17 +421,30 @@ impl Compiler {
             inside_function: true,
         };
 
+        let mut return_found: bool = false;
+
         for stmt in body {
             if matches!(stmt.node, Statement::Return(_)) {
                 function_compiler.indent();
                 function_compiler.output.push_str("return ");
                 if let Statement::Return(expr) = stmt.node {
-                    function_compiler.expression(expr)?;
+                    let type_: Type = function_compiler.expression(expr)?;
+                    if type_ != return_type {
+                        let expected: String = format!("expected {return_type:?}, got {type_:?}");
+                        return Err(format!(
+                            "Return type mismatch in function '{name}': {expected}"
+                        ));
+                    }
+                    return_found = true;
                 }
                 function_compiler.output.push_str(";\n");
-                break;
+                continue;
             }
             function_compiler.statement(stmt)?;
+        }
+
+        if !return_found && return_type != Type::Void {
+            return Err(format!("Function '{name}' is missing a return statement"));
         }
 
         function_output.push_str(&function_compiler.output);
@@ -450,7 +465,9 @@ impl Compiler {
         for (i, (condition, code_block)) in conditional_branches.iter().enumerate() {
             let output: String = format!("{} (", if i == 0 { "if" } else { "else if" });
             self.output.push_str(&output);
-            self.expression(condition.clone())?;
+            if self.expression(condition.clone())? != Type::Bool {
+                return Err(String::from("If condition must be of type Bool"));
+            }
             self.output.push_str(") {\n");
 
             self.indent_level += 1;
@@ -478,6 +495,26 @@ impl Compiler {
 
         self.output.push_str("\n\n");
 
+        Ok(())
+    }
+
+    fn while_loop_stmt(&mut self, condition: Expr, body: Vec<Stmt>) -> CompilerResult {
+        self.output.push('\n');
+        self.indent();
+        self.output.push_str("while (");
+
+        if self.expression(condition)? != Type::Bool {
+            return Err(String::from("While loop condition must be of type Bool"));
+        }
+
+        self.output.push_str(") {\n");
+        self.indent_level += 1;
+        for stmt in body {
+            self.statement(stmt)?;
+        }
+        self.indent_level -= 1;
+        self.indent();
+        self.output.push_str("}\n\n");
         Ok(())
     }
 
