@@ -118,6 +118,13 @@ pub enum Statement {
         /// The block to execute if the condition is false.
         else_branch: Option<Vec<Stmt>>,
     },
+    /// While loop statement.
+    While {
+        /// The condition expression.
+        condition: Expr,
+        /// The body of the while loop.
+        body: Vec<Stmt>,
+    },
     /// A return statement.
     Return(Expr),
     /// An expression statement.

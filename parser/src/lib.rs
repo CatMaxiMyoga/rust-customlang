@@ -112,8 +112,8 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Stmt, String> {
-        if self.match_token(&TokenKind::Keyword(Keyword::If)) {
-            self.parse_if_statement()
+        if matches!(self.peek()?.kind, TokenKind::Keyword(_)) {
+            self.parse_keyworded()
         } else if self.check_next_tokens(&[
             TokenKind::Identifier(String::new()),
             TokenKind::Identifier(String::new()),
@@ -130,21 +130,6 @@ impl Parser {
             TokenKind::LeftParen,
         ]) {
             self.parse_function_declaration()
-        } else if self.match_token(&TokenKind::Keyword(Keyword::Return)) {
-            let start: (usize, usize) =
-                self.expect_token(&TokenKind::Keyword(Keyword::Return))?.end;
-            if !self.outside_global_scope {
-                return Err(format!(
-                    "Return statement in global scope at {}:{}",
-                    start.0, start.1
-                ));
-            }
-            let expr: Expr = self.parse_expression()?;
-            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
-            Ok(Spanned {
-                node: Statement::Return(expr),
-                span: Span { start, end },
-            })
         } else if self.check_next_tokens(&[TokenKind::Identifier(String::new()), TokenKind::Equals])
         {
             self.parse_variable_assignment()
@@ -157,6 +142,40 @@ impl Parser {
                 node: Statement::Expression(expr),
                 span: Span { start, end },
             })
+        }
+    }
+
+    fn parse_keyworded(&mut self) -> Result<Stmt, String> {
+        let kind: TokenKind = self.peek()?.kind.clone();
+        match kind {
+            TokenKind::Keyword(keyword) => match keyword {
+                Keyword::If => self.parse_if_statement(),
+                Keyword::Else => {
+                    Err(format!(
+                        "Unexpected 'else' without matching 'if' at {}:{}",
+                        self.peek()?.start.0,
+                        self.peek()?.start.1
+                    ))
+                }
+                Keyword::While => self.parse_while_loop(),
+                Keyword::Return => {
+                    let start: (usize, usize) =
+                        self.expect_token(&TokenKind::Keyword(Keyword::Return))?.end;
+                    if !self.outside_global_scope {
+                        return Err(format!(
+                            "Return statement in global scope at {}:{}",
+                            start.0, start.1
+                        ));
+                    }
+                    let expr: Expr = self.parse_expression()?;
+                    let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                    Ok(Spanned {
+                        node: Statement::Return(expr),
+                        span: Span { start, end },
+                    })
+                }
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -224,6 +243,37 @@ impl Parser {
             node: Statement::If {
                 conditional_branches,
                 else_branch,
+            },
+            span: Span { start, end },
+        })
+    }
+
+    fn parse_while_loop(&mut self) -> Result<Stmt, String> {
+        let while_loop: Token = self.expect_token(&TokenKind::Keyword(Keyword::While))?.clone();
+        let start: (usize, usize) = while_loop.start;
+
+        let cond_start: (usize, usize) = self.expect_token(&TokenKind::LeftParen)?.start;
+        let condition: Expr = self.parse_expression()?;
+        let cond_end: (usize, usize) = self.expect_token(&TokenKind::RightParen)?.end;
+
+        self.expect_token(&TokenKind::LeftBrace)?;
+        let mut body: Vec<Stmt> = Vec::new();
+        while !self.match_token(&TokenKind::RightBrace) {
+            body.push(self.parse_statement()?);
+        }
+
+        let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.clone().end;
+
+        Ok(Spanned {
+            node: Statement::While {
+                condition: Spanned {
+                    node: condition.node,
+                    span: Span {
+                        start: cond_start,
+                        end: cond_end,
+                    },
+                },
+                body,
             },
             span: Span { start, end },
         })

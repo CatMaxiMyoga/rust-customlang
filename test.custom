@@ -41,4 +41,12 @@ Bool b = false;
 
 if (a) { print("a"); } else if (b) { print("b"); }
 
+Int i = 0;
+Int max = 10;
+
+while (i < max) {
+  printInt(i);
+  i = i + 1;
+}
+
 println("");

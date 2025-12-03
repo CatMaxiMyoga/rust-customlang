@@ -44,6 +44,7 @@ These are the currently working language features:
     - [Unary Operators](#unary-operators)
         - [Not `!`](#not-)
 - [If Statements](#if-statements)
+- [While Loops](#while-loops)
 
 # Currently Supported Literals
 ## Strings
@@ -569,3 +570,39 @@ if (condition) {
     println("else");
 }
 ```
+
+# While loops
+While loops are written using the `while` keyword followed by parentheses containing the condition
+evaluating to a [boolean](#booleans) followed by braces `{}` containing the code to run while the
+condition evaluates to `true`.
+```
+while (condition) {
+    println("true");
+}
+```
+
+If you want to run a loop a specific amount of times, you can make a variable that is the counter
+and either hardcode the end:
+```
+Int i = 0;
+while (i < 10) {
+    println(intToString(i)+" ");
+    i = i + 1;
+}
+>> 0 1 2 3 4 5 6 7 8 9 
+```
+
+or use another variable:
+```
+Int i = 0;
+Int max = 10;
+while (i < max) {
+    println(intToString(i)+" ");
+    i = i + 1;
+}
+>> 0 1 2 3 4 5 6 7 8 9 
+```
+
+In both of these cases the loop runs 10 times, starting at 0 and stopping when `i` becomes 10. It's
+important that the variable used as the counter, in this case `i`, is changed inside the while
+loop, otherwise it will run forever.
