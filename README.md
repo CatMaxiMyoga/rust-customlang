@@ -1,7 +1,7 @@
-**Updated last: 02/12/2025** *(WIP)*
+**Updated last: 06/12/2025** *(Up-To-Date)*
 
-I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
-These are the currently working language features:
+I'm making my own custom lexer, parser and compiler in Rust. These are the currently working
+language features:
 
 # Table of Contents
 - [Currently Supported Literals](#currently-supported-literals)
@@ -22,9 +22,18 @@ These are the currently working language features:
     - [Builtin Functions](#builtin-functions)
         - [`print(String)`](#builtin-print)
         - [`println(String)`](#builtin-println)
+        - [`boolToString(Bool)`](#builtin-tostring)
         - [`intToString(Int)`](#builtin-tostring)
         - [`floatToString(Float)`](#builtin-tostring)
-        - [`boolToString(Bool)`](#builtin-tostring)
+        - [`stringToBool(String)`](#builtin-tobool)
+        - [`intToBool(Int)`](#builtin-tobool)
+        - [`floatToBool(Float)`](#builtin-tobool)
+        - [`stringToInt(String)`](#builtin-toint)
+        - [`boolToInt(Bool)`](#builtin-toint)
+        - [`floatToInt(Float)`](#builtin-toint)
+        - [`stringToFloat(String)`](#builtin-tofloat)
+        - [`boolToFloat(Bool)`](#builtin-tofloat)
+        - [`intToFloat(Int)`](#builtin-tofloat)
 - [Operators](#operators)
     - [Binar Operators](#binary-operators)
         - [Operator Precedence](#operator-precedence)
@@ -323,9 +332,36 @@ It works the same as the [print](#builtin-print) function, but calls `println!("
 These functions turn other value types into [String](#strings) types so they can be printed. These
 functions would be defined as
 ```
+String boolToString(Bool b) { ... }
 String intToString(Int i) { ... }
 String floatToString(Float f) { ... }
-String boolToString(Bool b) { ... }
+```
+
+#### Builtin `*ToBool`
+These functions turn other value types into [Bool](#booleans) types so they can be used in
+conditions. These functions would be defined as
+```
+Bool stringToBool(String s) { ... }
+Bool intToBool(Int i) { ... }
+Bool floatToBool(Float f) { ... }
+```
+
+#### Builtin `*ToInt`
+These functions turn other value types into [Int](#integers) types. These functions would be
+defined as
+```
+Int stringToInt(String s) { ... }
+Int boolToInt(Bool b) { ... }
+Int floatToInt(Float f) { ... }
+```
+
+#### Builtin `*ToFloat`
+These functions turn other value types into [Float](#floating-point-numbers) types. These functions
+would be defined as
+```
+Float stringToFloat(String s) { ... }
+Float boolToFloat(Bool b) { ... }
+Float intToFloat(Int i) { ... }
 ```
 
 # Operators
