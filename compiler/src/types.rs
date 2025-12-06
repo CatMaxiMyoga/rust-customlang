@@ -157,9 +157,18 @@ impl Type {
 pub enum BuiltinFunction {
     Print,
     Println,
+    StringToBool,
+    StringToInt,
+    StringToFloat,
     BoolToString,
+    BoolToInt,
+    BoolToFloat,
     IntToString,
+    IntToBool,
+    IntToFloat,
     FloatToString,
+    FloatToBool,
+    FloatToInt,
 }
 
 impl BuiltinFunction {
@@ -168,9 +177,18 @@ impl BuiltinFunction {
         match self {
             Self::Print => "rustmm_builtin_print",
             Self::Println => "rustmm_builtin_println",
+            Self::StringToBool => "rustmm_builtin_stringToBool",
+            Self::StringToInt => "rustmm_builtin_stringToInt",
+            Self::StringToFloat => "rustmm_builtin_stringToFloat",
             Self::BoolToString => "rustmm_builtin_boolToString",
+            Self::BoolToInt => "rustmm_builtin_boolToInt",
+            Self::BoolToFloat => "rustmm_builtin_boolToFloat",
             Self::IntToString => "rustmm_builtin_intToString",
+            Self::IntToBool => "rustmm_builtin_intToBool",
+            Self::IntToFloat => "rustmm_builtin_intToFloat",
             Self::FloatToString => "rustmm_builtin_floatToString",
+            Self::FloatToBool => "rustmm_builtin_floatToBool",
+            Self::FloatToInt => "rustmm_builtin_floatToInt",
         }
     }
 

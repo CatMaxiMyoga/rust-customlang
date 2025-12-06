@@ -4,7 +4,6 @@ use std::{
     collections::HashMap,
     fs::{self, File},
     io::Write,
-    process::{Command, ExitStatus},
 };
 
 use parser::types::{
@@ -13,6 +12,7 @@ use parser::types::{
 
 use crate::types::{BuiltinFunction, CompilerResult, Functions, Type, prefix};
 mod types;
+mod io;
 
 const MAIN_HEADER: &str = r#"
 #include "rustmm_builtins.h"
@@ -43,6 +43,7 @@ pub struct Compiler {
 }
 
 impl Default for Compiler {
+    #[allow(clippy::too_many_lines)]
     fn default() -> Self {
         let mut funcs: HashMap<String, (Vec<(Type, String)>, String)> = HashMap::new();
         let mut env_: HashMap<String, Type> = HashMap::new();
@@ -87,6 +88,78 @@ impl Default for Compiler {
             Type::String,
         );
 
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToBool",
+            vec![(Type::String, "s")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "intToBool",
+            vec![(Type::Int, "i")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "floatToBool",
+            vec![(Type::Float, "f")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToInt",
+            vec![(Type::String, "s")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "boolToInt",
+            vec![(Type::Bool, "b")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "floatToInt",
+            vec![(Type::Float, "f")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToFloat",
+            vec![(Type::String, "s")],
+            Type::Float,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "boolToFloat",
+            vec![(Type::Bool, "b")],
+            Type::Float,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "intToFloat",
+            vec![(Type::Int, "i")],
+            Type::Float,
+        );
+
         Self {
             output: String::new(),
             functions: funcs,
@@ -106,7 +179,7 @@ impl Compiler {
         program: Program,
         out_file: &str,
         transpile_only: bool,
-        gcc_args: &str,
+        gcc_args: &[String],
         clean_up: bool,
     ) -> CompilerResult {
         let mut compiler: Self = Self {
@@ -122,13 +195,7 @@ impl Compiler {
 
         fs::create_dir_all("out").map_err(|_| String::from("Unable to create out/ directory"))?;
 
-        if clean_up {
-            Command::new("sh")
-                .arg("-c")
-                .arg("rm out/* 2>/dev/null")
-                .status()
-                .ok();
-        }
+        io::cleanup(clean_up);
 
         let mut main_file: File = File::create("out/rustmm_user_code.c")
             .map_err(|_| String::from("Unable to create c main file."))?;
@@ -187,53 +254,20 @@ impl Compiler {
             }
         }
 
-        let status: ExitStatus = Command::new("sh")
-            .arg("-c")
-            .arg("cp compiler/c_runtime/*.c compiler/c_runtime/*.h out/")
-            .status()
-            .map_err(|_| String::from("Failed to copy runtime files"))?;
-
-        if !status.success() {
-            return Err(String::from("Failed to copy runtime files"));
-        }
+        io::copy_runtime_files()?;
 
         if transpile_only {
             println!("Transpiled C code is in out/");
             return Ok(());
         }
 
-        let out_arg: String = match out_file {
-            "" => String::new(),
-            x => format!(r#"-o "{x}""#),
+        let out_arg: [&str; 2] = match out_file {
+            "" => ["", ""],
+            x => ["-o", x],
         };
 
-        let status: ExitStatus = Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "cd ~/dev/rust-customlang/out && gcc ./*.c {out_arg} {gcc_args}"
-            ))
-            .status()
-            .map_err(|_| String::from("GCC compilation failed"))?;
-
-        if status.success() {
-            if out_arg.is_empty() {
-                println!("Output is in out/");
-            } else {
-                println!("Output binary is at out/{out_file}");
-            }
-        } else {
-            return Err(String::from("GCC compilation failed"));
-        }
-
-        let status: ExitStatus = Command::new("sh")
-            .arg("-c")
-            .arg("rm out/*.c out/*.h")
-            .status()
-            .map_err(|_| String::from("Failed to clean up temporary files"))?;
-
-        if !status.success() {
-            return Err(String::from("Failed to clean up temporary files"));
-        }
+        io::gcc_compile(out_arg, gcc_args, out_file)?;
+        io::cleanup_temp_files()?;
 
         Ok(())
     }
