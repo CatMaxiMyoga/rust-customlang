@@ -1,7 +1,7 @@
 **Updated last: 06/12/2025** *(Up-To-Date)*
 
-I'm making my own custom lexer, parser and interpreter (and maybe later also compiler) in Rust.
-These are the currently working language features:
+I'm making my own custom lexer, parser and compiler in Rust. These are the currently working
+language features:
 
 # Table of Contents
 - [Currently Supported Literals](#currently-supported-literals)
