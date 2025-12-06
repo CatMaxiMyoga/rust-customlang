@@ -43,6 +43,7 @@ pub struct Compiler {
 }
 
 impl Default for Compiler {
+    #[allow(clippy::too_many_lines)]
     fn default() -> Self {
         let mut funcs: HashMap<String, (Vec<(Type, String)>, String)> = HashMap::new();
         let mut env_: HashMap<String, Type> = HashMap::new();
@@ -85,6 +86,78 @@ impl Default for Compiler {
             "boolToString",
             vec![(Type::Bool, "b")],
             Type::String,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToBool",
+            vec![(Type::String, "s")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "intToBool",
+            vec![(Type::Int, "i")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "floatToBool",
+            vec![(Type::Float, "f")],
+            Type::Bool,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToInt",
+            vec![(Type::String, "s")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "boolToInt",
+            vec![(Type::Bool, "b")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "floatToInt",
+            vec![(Type::Float, "f")],
+            Type::Int,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "stringToFloat",
+            vec![(Type::String, "s")],
+            Type::Float,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "boolToFloat",
+            vec![(Type::Bool, "b")],
+            Type::Float,
+        );
+
+        Self::add_builtin_func(
+            &mut funcs,
+            &mut env_,
+            "intToFloat",
+            vec![(Type::Int, "i")],
+            Type::Float,
         );
 
         Self {

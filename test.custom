@@ -50,3 +50,12 @@ while (i < max) {
 }
 
 println("");
+
+printBool(stringToBool(""));
+printBool(intToBool(0));
+printBool(floatToBool(0.0));
+printBool(stringToBool("hello"));
+printBool(intToBool(3));
+printBool(floatToBool(2.5));
+
+println("");
