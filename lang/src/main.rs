@@ -78,8 +78,6 @@ fn main() {
         std::process::exit(1);
     }
 
-    let gcc_args: String = gcc_args.join(" ");
-
     if let Some(extension) = filepath.extension() {
         if extension != LANGUAGE_EXTENSION {
             eprintln!("Invalid file extension. Expected a .{LANGUAGE_EXTENSION} file.");
