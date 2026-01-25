@@ -126,7 +126,7 @@ pub enum Statement {
         body: Vec<Stmt>,
     },
     /// A return statement.
-    Return(Expr),
+    Return(Option<Expr>),
     /// An expression statement.
     Expression(Expr),
 }

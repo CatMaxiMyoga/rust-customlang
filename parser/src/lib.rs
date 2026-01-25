@@ -150,24 +150,20 @@ impl Parser {
         match kind {
             TokenKind::Keyword(keyword) => match keyword {
                 Keyword::If => self.parse_if_statement(),
-                Keyword::Else => {
-                    Err(format!(
-                        "Unexpected 'else' without matching 'if' at {}:{}",
-                        self.peek()?.start.0,
-                        self.peek()?.start.1
-                    ))
-                }
+                Keyword::Else => Err(format!(
+                    "Unexpected 'else' without matching 'if' at {}:{}",
+                    self.peek()?.start.0,
+                    self.peek()?.start.1
+                )),
                 Keyword::While => self.parse_while_loop(),
                 Keyword::Return => {
                     let start: (usize, usize) =
                         self.expect_token(&TokenKind::Keyword(Keyword::Return))?.end;
-                    if !self.outside_global_scope {
-                        return Err(format!(
-                            "Return statement in global scope at {}:{}",
-                            start.0, start.1
-                        ));
-                    }
-                    let expr: Expr = self.parse_expression()?;
+                    let expr: Option<Expr> = if self.match_token(&TokenKind::Semicolon) {
+                        None
+                    } else {
+                        Some(self.parse_expression()?)
+                    };
                     let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
                     Ok(Spanned {
                         node: Statement::Return(expr),
@@ -249,7 +245,9 @@ impl Parser {
     }
 
     fn parse_while_loop(&mut self) -> Result<Stmt, String> {
-        let while_loop: Token = self.expect_token(&TokenKind::Keyword(Keyword::While))?.clone();
+        let while_loop: Token = self
+            .expect_token(&TokenKind::Keyword(Keyword::While))?
+            .clone();
         let start: (usize, usize) = while_loop.start;
 
         let cond_start: (usize, usize) = self.expect_token(&TokenKind::LeftParen)?.start;
