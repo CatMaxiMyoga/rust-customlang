@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+compiler = { path = "../compiler" }
 lexer = { path = "../lexer" }
 parser = { path = "../parser" }
-compiler = { path = "../compiler" }
+transpiler = { path = "../transpiler" }
 
 [lints]
 workspace = true

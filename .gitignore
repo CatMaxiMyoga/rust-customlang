@@ -1,2 +1,3 @@
 /target
-/out
+**/cs_runtime/bin
+**/cs_runtime/obj

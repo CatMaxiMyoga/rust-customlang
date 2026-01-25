@@ -1,6 +1,6 @@
 println("Hi there!");
 
-Void printBool(Bool b) {
+void printBool(bool b) {
   print(boolToString(b) + " ");
 }
 
@@ -10,7 +10,7 @@ printBool(4 != 4);
 printBool(2 + 2 == 4);
 println("");
 
-Void printInt(Int i) {
+void printInt(int i) {
   print(intToString(i) + " ");
 }
 
@@ -20,7 +20,7 @@ printInt(10-15);
 printInt((5+5)/3);
 println("");
 
-Void printFloat(Float f) {
+void printFloat(float f) {
   print(floatToString(f) + " ");
 }
 
@@ -36,13 +36,13 @@ printBool(true && !false);
 printBool((true || false) && false);
 println("");
 
-Bool a = false;
-Bool b = false;
+bool a = false;
+bool b = false;
 
 if (a) { print("a"); } else if (b) { print("b"); }
 
-Int i = 0;
-Int max = 10;
+int i = 0;
+int max = 10;
 
 while (i < max) {
   printInt(i);
