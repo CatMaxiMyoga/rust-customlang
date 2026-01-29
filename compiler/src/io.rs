@@ -94,3 +94,23 @@ pub fn cleanup_temp_files() {
 
     fs::remove_dir_all(&runtime_dir).expect("Failed to remove temporary runtime directory");
 }
+
+pub fn move_executable(output_file: &str) {
+    let cwd: PathBuf = get_cwd().expect("Failed to get current working directory");
+    let temp_exe: PathBuf = cwd.join(if cfg!(target_os = "windows") {
+        "__tmp__customlang.exe"
+    } else {
+        "__tmp__customlang"
+    });
+    let dest_exe: PathBuf = cwd.join(output_file);
+
+    if let Some(dest_dir) = dest_exe.parent() {
+        if fs::create_dir_all(dest_dir).is_err() {
+            eprintln!("Failed to create output directory, skipping...");
+        }
+    } else {
+        eprintln!("Failed to get output directory, skipping...");
+    }
+
+    fs::rename(temp_exe, dest_exe).expect("Failed to move executable to output file");
+}
