@@ -30,18 +30,14 @@ fn main() {
 
     let mut output_filename: Option<String> = None;
 
-    if args.len() > 2 {
-        let index: usize = args.iter().position(|x| x == "-o").unwrap_or(usize::MAX);
-
-        if index != usize::MAX && index < args.len() {
-            eprintln!("Invalid number of arguments. {USAGE}");
+    if let Some(index) = args.iter().position(|x| x == "-o") {
+        if index + 1 >= args.len() {
+            eprintln!("Missing value for -o option. {USAGE}");
             std::process::exit(1);
         }
 
-        if index != usize::MAX {
-            output_filename = Some(args[(index + 1) as usize].clone());
-            args.drain(index as usize..=index as usize + 1);
-        }
+        output_filename = Some(args[index + 1].clone());
+        args.drain(index..=index + 1);
     }
 
     if let Some(extension) = filepath.extension() {
