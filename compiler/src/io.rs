@@ -66,8 +66,6 @@ pub fn call_compiler() {
     let cwd: PathBuf = get_cwd().expect("Failed to get current working directory");
     let runtime_dir: PathBuf = cwd.join(TEMP_DIR);
 
-    fs::create_dir_all(cwd.join("out")).expect("Failed to create output directory");
-
     #[rustfmt::skip]
     let status = Command::new("dotnet")
         .args([
@@ -78,7 +76,7 @@ pub fn call_compiler() {
             "/p:PublishSingleFile=true",
             "/p:DebugType=None",
             "/p:DebugSymbols=false",
-            "-o", "../out"
+            "-o", ".."
         ])
         .current_dir(&runtime_dir)
         .status()
