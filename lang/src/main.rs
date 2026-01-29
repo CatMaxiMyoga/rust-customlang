@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use compiler::Compiler;
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
 use transpiler::Transpiler;
@@ -9,7 +10,7 @@ use transpiler::Transpiler;
 const LANGUAGE_EXTENSION: &str = "custom";
 
 const USAGE: &str = r"
-USAGE: lang <source-file>
+USAGE: lang <source-file> [-o <output_file>]
 ";
 
 fn main() {
@@ -25,6 +26,22 @@ fn main() {
     if !filepath.exists() {
         eprint!("File not found: {filename} {USAGE}");
         std::process::exit(1);
+    }
+
+    let mut output_filename: Option<String> = None;
+
+    if args.len() > 2 {
+        let index: usize = args.iter().position(|x| x == "-o").unwrap_or(usize::MAX);
+
+        if index != usize::MAX && index < args.len() {
+            eprintln!("Invalid number of arguments. {USAGE}");
+            std::process::exit(1);
+        }
+
+        if index != usize::MAX {
+            output_filename = Some(args[(index + 1) as usize].clone());
+            args.drain(index as usize..=index as usize + 1);
+        }
     }
 
     if let Some(extension) = filepath.extension() {
@@ -60,11 +77,7 @@ fn main() {
         }
     };
 
-    // if let Err(err) = Compiler::compile(program, &out_file, transpile_only, &gcc_args, clean_up) {
-    //     eprintln!("Compiler error: {err}");
-    //     std::process::exit(1);
-    // }
-
     let transpiled_code: String = Transpiler::transpile(program);
-    print!("{transpiled_code}");
+
+    Compiler::compile(&transpiled_code, output_filename);
 }
