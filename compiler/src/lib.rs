@@ -10,18 +10,16 @@ impl Compiler {
     ///
     /// Arguments:
     /// - `cs_code`: The C# code to compile as a string slice.
-    pub fn compile(cs_code: &str, output_file: Option<&str>) {
+    pub fn compile(cs_code: &str, output_file: Option<String>) {
         io::copy_runtime();
         io::write_file(cs_code);
         io::call_compiler();
         io::cleanup_temp_files();
 
         #[rustfmt::skip]
-        io::move_executable(output_file.unwrap_or(
-            {
-                #[cfg(target_os = "windows")] { "output.exe" }
-                #[cfg(not(target_os = "windows"))] { "output" }
-            }
-        ));
+        io::move_executable(&output_file.unwrap_or_else( || {
+            #[cfg(target_os = "windows")] { "output.exe".to_string() }
+            #[cfg(not(target_os = "windows"))] { "output".to_string() }
+        }));
     }
 }

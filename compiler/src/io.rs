@@ -97,10 +97,10 @@ pub fn cleanup_temp_files() {
 
 pub fn move_executable(output_file: &str) {
     let cwd: PathBuf = get_cwd().expect("Failed to get current working directory");
-    let temp_exe: PathBuf = cwd.join(if cfg!(target_os = "windows") {
-        "__tmp__customlang.exe"
-    } else {
-        "__tmp__customlang"
+    #[rustfmt::skip]
+    let temp_exe: PathBuf = cwd.join({
+        #[cfg(target_os = "windows")] { "__tmp__customlang.exe" }
+        #[cfg(not(target_os = "windows"))] { "__tmp__customlang" }
     });
     let dest_exe: PathBuf = cwd.join(output_file);
 
