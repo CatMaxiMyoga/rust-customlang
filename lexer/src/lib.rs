@@ -114,6 +114,7 @@ impl Lexer {
             ';' => Some(TokenKind::Semicolon),
             '=' => Some(TokenKind::Equals),
             '!' => Some(TokenKind::Exclamation),
+            '.' => Some(TokenKind::Dot),
             _ => None,
         };
 
@@ -127,6 +128,13 @@ impl Lexer {
     }
 
     fn number(&mut self, tokens: &mut Vec<Token>) -> Result<bool, String> {
+        if self.index + 1 < self.source.len()
+            && self.source[self.index] == '.'
+            && !self.source[self.index + 1].is_numeric()
+        {
+            return Ok(false);
+        }
+
         let mut number_vec: Vec<char> = vec![];
         let mut dot_seen: bool = false;
         let start_loc: (usize, usize) = (self.line, self.column);
