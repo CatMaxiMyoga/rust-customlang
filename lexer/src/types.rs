@@ -13,6 +13,8 @@ pub enum Keyword {
     While,
     /// Class keyword, used for defining classes.
     Class,
+    /// Self keyword, used to refer to the current instance in class methods.
+    Self_,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may

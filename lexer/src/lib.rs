@@ -223,6 +223,8 @@ impl Lexer {
                 "while" => TokenKind::Keyword(Keyword::While),
                 "true" => TokenKind::Boolean(true),
                 "false" => TokenKind::Boolean(false),
+                "class" => TokenKind::Keyword(Keyword::Class),
+                "self" => TokenKind::Keyword(Keyword::Self_),
                 identifier => TokenKind::Identifier(String::from(identifier)),
             };
 
