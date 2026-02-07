@@ -226,6 +226,7 @@ impl Lexer {
                 "class" => TokenKind::Keyword(Keyword::Class),
                 "self" => TokenKind::Keyword(Keyword::Self_),
                 "Self" => TokenKind::Keyword(Keyword::SelfType),
+                "static" => TokenKind::Keyword(Keyword::Static),
                 identifier => TokenKind::Identifier(String::from(identifier)),
             };
 

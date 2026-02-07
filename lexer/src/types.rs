@@ -17,6 +17,8 @@ pub enum Keyword {
     Self_,
     /// Self type keyword, used to refer to the type of the current class.
     SelfType,
+    /// Static keyword, used for marking class members as public.
+    Static,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
