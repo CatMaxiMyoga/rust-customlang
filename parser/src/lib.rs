@@ -318,49 +318,72 @@ impl Parser {
                     let start: (usize, usize) = token.start;
                     let end: (usize, usize) = token.end;
 
-                    if self.inside_class.is_some() && !self.inside_static {
-                        Ok(Spanned {
-                            node: Statement::Expression(Spanned {
-                                node: Expression::Self_,
+                    if self.inside_class.is_none() {
+                        return Err(format!(
+                            "Illegal use of 'self' outside class at {}:{}",
+                            token.start.0, token.start.1
+                        ));
+                    }
+
+                    let mut expr: Expr = Spanned {
+                        node: Expression::Self_,
+                        span: Span { start, end },
+                    };
+
+                    expr = self.parse_postfix_chain(expr, start)?;
+
+                    match self.peek()?.kind {
+                        TokenKind::Equals => self.parse_named_assignment(Box::new(expr), start),
+                        TokenKind::Semicolon => {
+                            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                            Ok(Spanned {
+                                node: Statement::Expression(expr),
                                 span: Span { start, end },
-                            }),
-                            span: Span { start, end },
-                        })
-                    } else {
-                        Err(format!(
-                            "Illegal use of 'self' outside class instance methods at {}:{}",
-                            start.0, start.1
-                        ))
+                            })
+                        }
+                        _ => Err(format!(
+                            "Unexpected token after 'self' expression at {}:{}",
+                            self.peek()?.start.0,
+                            self.peek()?.start.1
+                        )),
                     }
                 }
                 Keyword::SelfType => {
+                    if self.inside_class.is_none() {
+                        let token: Token = self
+                            .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
+                            .clone();
+                        return Err(format!(
+                            "Illegal use of 'Self' outside class at {}:{}",
+                            token.start.0, token.start.1
+                        ));
+                    }
+
                     let token: Token = self
                         .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
                         .clone();
-                    let start: (usize, usize) = token.start;
-                    let end: (usize, usize) = token.end;
 
-                    self.inside_class.as_ref().map_or_else(
-                        || {
-                            Err(format!(
-                                "Illegal use of 'Self' outside class at {}:{}",
-                                start.0, start.1
-                            ))
-                        },
-                        |class_name| {
-                            Ok(Spanned {
-                                node: Statement::Expression(Spanned {
-                                    node: Expression::SelfType(class_name.clone()),
-                                    span: Span { start, end },
-                                }),
-                                span: Span { start, end },
-                            })
-                        },
-                    )
+                    if matches!(self.peek()?.kind, TokenKind::Identifier(_)) {
+                        self.advance();
+                        let next_token: Token = self.peek()?.clone();
+
+                        self.index -= 2;
+                        match next_token.kind {
+                            TokenKind::LeftParen => self.parse_function_declaration(),
+                            TokenKind::Semicolon => self.parse_field_declaration(),
+                            _ => Err(format!(
+                                "Expected '(' or ';' after identifier at {}:{}",
+                                next_token.start.0, next_token.start.1
+                            )),
+                        }
+                    } else {
+                        Err(format!(
+                            "Expected identifier after 'Self' at {}:{}",
+                            token.start.0, token.start.1
+                        ))
+                    }
                 }
                 Keyword::Static => {
-                    self.inside_static = true;
-
                     if self.inside_class.is_none() {
                         return Err(format!(
                             "The 'static' keyword can only be used inside a class at {}:{}",
@@ -372,23 +395,23 @@ impl Parser {
                     let token: Token = self
                         .expect_token(&TokenKind::Keyword(Keyword::Static))?
                         .clone();
+
+                    self.inside_static = true;
                     let stmt: Stmt = self.parse_statement()?;
+                    self.inside_static = false;
 
                     match &stmt.node {
                         Statement::MethodDeclaration { .. }
-                        | Statement::FieldDeclaration { .. } => {
-                            self.inside_static = true;
-                            Ok(Spanned {
-                                node: stmt.node,
-                                span: Span {
-                                    start: token.start,
-                                    end: stmt.span.end,
-                                },
-                            })
-                        }
+                        | Statement::FieldDeclaration { .. } => Ok(Spanned {
+                            node: stmt.node,
+                            span: Span {
+                                start: token.start,
+                                end: stmt.span.end,
+                            },
+                        }),
                         _ => Err(format!(
                             "The 'static' keyword can only be used on method and {}{}:{}",
-                            " declarations at ", token.start.0, token.start.1
+                            "field declarations at ", token.start.0, token.start.1
                         )),
                     }
                 }
@@ -583,6 +606,9 @@ impl Parser {
         let token: Token = self.peek()?.clone();
         let type_: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
+            TokenKind::Keyword(Keyword::SelfType) => {
+                self.inside_class.as_ref().expect("checked before").into()
+            }
             _ => unreachable!(),
         };
         let start: (usize, usize) = token.start;
@@ -609,6 +635,9 @@ impl Parser {
         let token: Token = self.peek()?.clone();
         let return_type: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
+            TokenKind::Keyword(Keyword::SelfType) => {
+                self.inside_class.as_ref().expect("checked before").into()
+            }
             _ => unreachable!(),
         };
         self.advance();
@@ -864,23 +893,50 @@ impl Parser {
             }
             TokenKind::Identifier(identifier) => {
                 self.advance();
-                if self.match_token(&TokenKind::LeftParen) {
-                    self.expect_token(&TokenKind::LeftParen)?;
-                    return self.parse_function_call(
-                        Box::new(Spanned {
-                            node: Expression::Identifier(identifier),
-                            span: Span {
-                                start,
-                                end: token.end,
+                match self.peek()?.kind {
+                    TokenKind::LeftParen => {
+                        self.expect_token(&TokenKind::LeftParen)?;
+                        return self.parse_function_call(
+                            Box::new(Spanned {
+                                node: Expression::Identifier(identifier),
+                                span: Span {
+                                    start,
+                                    end: token.end,
+                                },
+                            }),
+                            start,
+                        );
+                    }
+                    TokenKind::Dot => {
+                        return self.parse_postfix_chain(
+                            Spanned {
+                                node: Expression::Identifier(identifier),
+                                span: Span {
+                                    start,
+                                    end: token.end,
+                                },
                             },
-                        }),
-                        start,
-                    );
+                            start,
+                        );
+                    }
+                    _ => {}
                 }
                 Ok(Spanned {
                     node: Expression::Identifier(identifier),
                     span: Span {
                         start,
+                        end: token.end,
+                    },
+                })
+            }
+            TokenKind::Keyword(Keyword::Self_) => {
+                let token: Token = self
+                    .expect_token(&TokenKind::Keyword(Keyword::Self_))?
+                    .clone();
+                Ok(Spanned {
+                    node: Expression::Self_,
+                    span: Span {
+                        start: token.start,
                         end: token.end,
                     },
                 })
