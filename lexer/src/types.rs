@@ -11,6 +11,14 @@ pub enum Keyword {
     Else,
     /// While keyword, used for looping constructs.
     While,
+    /// Class keyword, used for defining classes.
+    Class,
+    /// Self keyword, used to refer to the current instance in class methods.
+    Self_,
+    /// Self type keyword, used to refer to the type of the current class.
+    SelfType,
+    /// Static keyword, used for marking class members as public.
+    Static,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
@@ -65,6 +73,8 @@ pub enum TokenKind {
     And,
     /// !
     Exclamation,
+    /// .
+    Dot,
     /// Represents an identifier.
     Identifier(String),
     /// Represents a keyword.
@@ -94,7 +104,11 @@ impl Token {
     /// * `end` - The ending position of the token (line, column).
     #[must_use]
     pub const fn new(kind: TokenKind, start: (usize, usize), end: (usize, usize)) -> Self {
-        Self { kind, start, end: (end.0, end.1 - 1) }
+        Self {
+            kind,
+            start,
+            end: (end.0, end.1 - 1),
+        }
     }
 
     /// Creates a new token that spans a single character at the specified line and column.

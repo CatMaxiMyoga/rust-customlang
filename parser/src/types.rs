@@ -72,13 +72,22 @@ pub enum Expression {
         /// The operand expression.
         operand: Box<Expr>,
     },
-    /// A function call expression.
-    FunctionCall {
-        /// The name of the function being called.
-        name: String,
+    /// A function/member call expression.
+    Call {
+        /// The callee being called.
+        callee: Box<Expr>,
         /// The arguments passed to the function.
         arguments: Vec<Expr>,
     },
+    /// A member access expression.
+    MemberAccess {
+        /// The object whose member is being accessed.
+        object: Box<Expr>,
+        /// The name of the member being accessed.
+        member: String,
+    },
+    /// Special expression representing the current class instance.
+    Self_,
 }
 
 /// Represents statements in the AST.
@@ -93,10 +102,19 @@ pub enum Statement {
         /// The initial value of the variable.
         value: Option<Expr>,
     },
-    /// Variable assignment statement.
-    VariableAssignment {
-        /// The name of the variable.
+    /// A field declaration statement.
+    FieldDeclaration {
+        /// The type of the field.
+        type_: String,
+        /// The name of the field.
         name: String,
+        /// Static field or not.
+        static_: bool,
+    },
+    /// Variable/Member assignment statement.
+    Assignment {
+        /// The variable being assigned to.
+        assignee: Box<Expr>,
         /// The new value of the variable.
         value: Expr,
     },
@@ -110,6 +128,26 @@ pub enum Statement {
         parameters: Vec<(String, String)>,
         /// The body of the function.
         body: Vec<Stmt>,
+    },
+    /// A class declaration statement.
+    ClassDeclaration {
+        /// The name of the class.
+        name: String,
+        /// The body of the class.
+        body: Vec<Stmt>,
+    },
+    /// A method declaration statement.
+    MethodDeclaration {
+        /// The return type of the function.
+        return_type: String,
+        /// The name of the function.
+        name: String,
+        /// The parameters of the function `(Type, Identifier)`.
+        parameters: Vec<(String, String)>,
+        /// The body of the function.
+        body: Vec<Stmt>,
+        /// Static method or not.
+        static_: bool,
     },
     /// If statement.
     If {
