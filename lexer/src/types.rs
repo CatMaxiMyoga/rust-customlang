@@ -15,6 +15,8 @@ pub enum Keyword {
     Class,
     /// Self keyword, used to refer to the current instance in class methods.
     Self_,
+    /// Self type keyword, used to refer to the type of the current class.
+    SelfType,
 }
 
 /// Defines the different kinds of tokens that can be recognized by the lexer. Each variant may
