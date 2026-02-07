@@ -59,3 +59,19 @@ printBool(intToBool(3));
 printBool(floatToBool(2.5));
 
 println("");
+
+
+class X {
+  int x;
+
+  Self X(int a) {
+    x = a;
+  }
+
+  void printX() {
+    println("X(" + intToString(x) + ")");
+  }
+}
+
+X y = X.new(10);
+y.printX();
