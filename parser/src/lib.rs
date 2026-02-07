@@ -15,6 +15,8 @@ pub struct Parser {
     tokens: Vec<Token>,
     index: usize,
     outside_global_scope: bool,
+    inside_class: bool,
+    inside_static_method: bool, // Not yet implemented
 }
 
 impl Parser {
@@ -36,6 +38,8 @@ impl Parser {
             tokens,
             index: 0,
             outside_global_scope: false,
+            inside_class: false,
+            inside_static_method: false,
         };
 
         let mut statements: Vec<Stmt> = Vec::new();
@@ -111,37 +115,172 @@ impl Parser {
         true
     }
 
+    fn parse_postfix_chain(
+        &mut self,
+        mut expr: Expr,
+        start: (usize, usize),
+    ) -> Result<Expr, String> {
+        loop {
+            match self.peek()?.kind.clone() {
+                TokenKind::Dot => {
+                    self.advance();
+                    let member: &Token =
+                        self.expect_token_kind(&TokenKind::Identifier(String::new()))?;
+
+                    expr = Spanned {
+                        node: Expression::MemberAccess {
+                            object: Box::new(expr),
+                            member: match &member.kind {
+                                TokenKind::Identifier(name) => name.clone(),
+                                _ => unreachable!(),
+                            },
+                        },
+                        span: Span {
+                            start,
+                            end: member.end,
+                        },
+                    };
+                }
+                TokenKind::LeftParen => {
+                    self.advance();
+                    expr = self.parse_function_call(Box::new(expr), start)?;
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     fn parse_statement(&mut self) -> Result<Stmt, String> {
         if matches!(self.peek()?.kind, TokenKind::Keyword(_)) {
-            self.parse_keyworded()
-        } else if self.check_next_tokens(&[
-            TokenKind::Identifier(String::new()),
-            TokenKind::Identifier(String::new()),
-            TokenKind::Equals,
-        ]) || self.check_next_tokens(&[
-            TokenKind::Identifier(String::new()),
-            TokenKind::Identifier(String::new()),
-            TokenKind::Semicolon,
-        ]) {
-            self.parse_variable_declaration()
-        } else if self.check_next_tokens(&[
-            TokenKind::Identifier(String::new()),
-            TokenKind::Identifier(String::new()),
-            TokenKind::LeftParen,
-        ]) {
-            self.parse_function_declaration()
-        } else if self.check_next_tokens(&[TokenKind::Identifier(String::new()), TokenKind::Equals])
-        {
-            self.parse_variable_assignment()
-        } else {
-            let expr: Expr = self.parse_expression()?;
-            let start: (usize, usize) = expr.span.start;
+            return self.parse_keyworded();
+        }
 
+        let first_token: Token = self.peek()?.clone();
+        let first_ident: String = if let TokenKind::Identifier(name) = &first_token.kind {
+            name.clone()
+        } else {
+            let expr: Spanned<Expression> = self.parse_expression()?;
+            let start: (usize, usize) = expr.span.start;
             let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
-            Ok(Spanned {
+            return Ok(Spanned {
                 node: Statement::Expression(expr),
                 span: Span { start, end },
-            })
+            });
+        };
+
+        let start: (usize, usize) = self.peek()?.start;
+        self.advance();
+
+        let second_token_kind: TokenKind = self.peek()?.kind.clone();
+        self.advance();
+
+        match second_token_kind {
+            TokenKind::Identifier(_) => match self.peek()?.kind.clone() {
+                TokenKind::Equals | TokenKind::Semicolon => {
+                    self.index -= 2;
+                    self.parse_variable_declaration()
+                }
+                TokenKind::LeftParen => {
+                    self.index -= 2;
+                    self.parse_function_declaration()
+                }
+                _ => {
+                    let peek: &Token = self.peek()?;
+                    Err(format!(
+                        "Invalid token following two identifiers: '{:?}' at {}:{}",
+                        peek.kind, peek.start.0, peek.start.1
+                    ))
+                }
+            },
+            TokenKind::Dot => {
+                self.index -= 1; // Set current token to dot. parse_postfix_chain MUST see the dot.
+                self.parse_statement_with_member(
+                    &Spanned {
+                        node: Expression::Identifier(first_ident),
+                        span: Span {
+                            start,
+                            end: first_token.end,
+                        },
+                    },
+                    start,
+                )
+            }
+            TokenKind::Equals => {
+                self.index -= 2;
+                self.parse_assignment()
+            }
+            TokenKind::LeftParen => {
+                let end: (usize, usize) = self.tokens[self.index - 1].end;
+                let expr: Expr = self.parse_function_call(
+                    Box::new(Spanned {
+                        node: Expression::Identifier(first_ident),
+                        span: Span { start, end },
+                    }),
+                    start,
+                )?;
+                if self.peek()?.kind == TokenKind::Dot {
+                    return self.parse_statement_with_member(&expr, start);
+                }
+                let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                Ok(Spanned {
+                    node: Statement::Expression(expr),
+                    span: Span { start, end },
+                })
+            }
+            TokenKind::Semicolon => {
+                self.index -= 1;
+                let expr: Expr = self.parse_expression()?;
+                let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                Ok(Spanned {
+                    node: Statement::Expression(expr),
+                    span: Span { start, end },
+                })
+            }
+            _ => {
+                let err_start: (usize, usize) = self.peek()?.start;
+                Err(format!(
+                    "Unexpected token after identifier: {:?} at {}:{}",
+                    first_ident, err_start.0, err_start.1
+                ))
+            }
+        }
+    }
+
+    fn parse_statement_with_member(
+        &mut self,
+        expr: &Expr,
+        start: (usize, usize),
+    ) -> Result<Stmt, String> {
+        let expr: Expr = self.parse_postfix_chain(expr.clone(), start)?;
+
+        match self.peek()?.kind.clone() {
+            TokenKind::Equals => self.parse_named_assignment(Box::new(expr), start),
+            TokenKind::Semicolon => {
+                let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                Ok(Spanned {
+                    node: Statement::Expression(expr),
+                    span: Span { start, end },
+                })
+            }
+            TokenKind::Dot | TokenKind::LeftParen => {
+                let expr: Expr = self.parse_postfix_chain(expr, start)?;
+                let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+                Ok(Spanned {
+                    node: Statement::Expression(expr),
+                    span: Span { start, end },
+                })
+            }
+            _ => {
+                let err_start: (usize, usize) = self.peek()?.start;
+                Err(format!(
+                    "Unexpected token after member access at {}:{}",
+                    err_start.0, err_start.1
+                ))
+            }
         }
     }
 
@@ -169,6 +308,29 @@ impl Parser {
                         node: Statement::Return(expr),
                         span: Span { start, end },
                     })
+                }
+                Keyword::Class => self.parse_class_declaration(),
+                Keyword::Self_ => {
+                    let token: Token = self
+                        .expect_token(&TokenKind::Keyword(Keyword::Self_))?
+                        .clone();
+                    let start: (usize, usize) = token.start;
+                    let end: (usize, usize) = token.end;
+
+                    if self.inside_class && !self.inside_static_method {
+                        Ok(Spanned {
+                            node: Statement::Expression(Spanned {
+                                node: Expression::Self_,
+                                span: Span { start, end },
+                            }),
+                            span: Span { start, end },
+                        })
+                    } else {
+                        Err(format!(
+                            "Illegal use of 'self' outside class instance methods at {}:{}",
+                            start.0, start.1
+                        ))
+                    }
                 }
             },
             _ => unreachable!(),
@@ -277,7 +439,58 @@ impl Parser {
         })
     }
 
+    fn parse_class_declaration(&mut self) -> Result<Stmt, String> {
+        if self.outside_global_scope {
+            return Err(format!(
+                "Class declarations are only allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
+        let class_token: Token = self
+            .expect_token(&TokenKind::Keyword(Keyword::Class))?
+            .clone();
+        let start: (usize, usize) = class_token.start;
+
+        let identifier: String = match self
+            .expect_token_kind(&TokenKind::Identifier(String::new()))?
+            .kind
+            .clone()
+        {
+            TokenKind::Identifier(name) => name,
+            _ => unreachable!(),
+        };
+
+        self.expect_token(&TokenKind::LeftBrace)?;
+
+        self.outside_global_scope = true;
+        self.inside_class = true;
+        self.inside_static_method = false;
+
+        let mut body: Vec<Stmt> = Vec::new();
+        while !self.match_token(&TokenKind::RightBrace) {
+            body.push(self.parse_statement()?);
+        }
+        let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
+
+        self.outside_global_scope = false;
+        self.inside_class = false;
+        self.inside_static_method = false;
+
+        Ok(Spanned {
+            node: Statement::ClassDeclaration {
+                name: identifier,
+                body,
+            },
+            span: Span { start, end },
+        })
+    }
+
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
+        if self.inside_class {
+            return self.parse_field_declaration();
+        }
         let token: Token = self.peek()?.clone();
         let type_: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
@@ -302,6 +515,28 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
         Ok(Spanned {
             node: Statement::VariableDeclaration { type_, name, value },
+            span: Span { start, end },
+        })
+    }
+
+    fn parse_field_declaration(&mut self) -> Result<Stmt, String> {
+        let token: Token = self.peek()?.clone();
+        let type_: String = match &token.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => unreachable!(),
+        };
+        let start: (usize, usize) = token.start;
+        self.advance();
+
+        let name: String = match &self.peek()?.kind {
+            TokenKind::Identifier(name) => name.clone(),
+            _ => unreachable!(),
+        };
+        self.advance();
+
+        let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+        Ok(Spanned {
+            node: Statement::FieldDeclaration { type_, name },
             span: Span { start, end },
         })
     }
@@ -334,18 +569,33 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
         self.outside_global_scope = outside_global_scope_backup;
 
-        Ok(Spanned {
-            node: Statement::FunctionDeclaration {
-                return_type,
-                name,
-                parameters,
-                body,
-            },
-            span: Span {
-                start: token.start,
-                end,
-            },
-        })
+        if self.inside_class {
+            Ok(Spanned {
+                node: Statement::MethodDeclaration {
+                    return_type,
+                    name,
+                    parameters,
+                    body,
+                },
+                span: Span {
+                    start: token.start,
+                    end,
+                },
+            })
+        } else {
+            Ok(Spanned {
+                node: Statement::FunctionDeclaration {
+                    return_type,
+                    name,
+                    parameters,
+                    body,
+                },
+                span: Span {
+                    start: token.start,
+                    end,
+                },
+            })
+        }
     }
 
     fn parse_function_declaration_parameters(&mut self) -> Result<Vec<(String, String)>, String> {
@@ -390,16 +640,11 @@ impl Parser {
         Ok(parameters)
     }
 
-    fn parse_variable_assignment(&mut self) -> Result<Stmt, String> {
-        let token: Token = self.peek()?.clone();
-        let identifier: String = match &token.kind {
-            TokenKind::Identifier(name) => name.clone(),
-            _ => {
-                unreachable!("Checked for identifier token before")
-            }
-        };
-
-        self.advance();
+    fn parse_named_assignment(
+        &mut self,
+        name: Box<Expr>,
+        start: (usize, usize),
+    ) -> Result<Stmt, String> {
         self.expect_token(&TokenKind::Equals)?;
 
         let value: Expr = self.parse_expression()?;
@@ -409,15 +654,30 @@ impl Parser {
         let end: (usize, usize) = value.span.end;
 
         Ok(Spanned {
-            node: Statement::VariableAssignment {
-                name: identifier,
+            node: Statement::Assignment {
+                assignee: name,
                 value,
             },
-            span: Span {
-                start: token.start,
-                end,
-            },
+            span: Span { start, end },
         })
+    }
+
+    fn parse_assignment(&mut self) -> Result<Stmt, String> {
+        let token: Token = self.peek()?.clone();
+        self.advance();
+        self.parse_named_assignment(
+            Box::new(Spanned {
+                node: Expression::Identifier(match &token.kind {
+                    TokenKind::Identifier(name) => name.clone(),
+                    x => unreachable!("Expected identifier, found {:?}", x),
+                }),
+                span: Span {
+                    start: token.start,
+                    end: token.end,
+                },
+            }),
+            token.start,
+        )
     }
 
     fn parse_expression(&mut self) -> Result<Expr, String> {
@@ -541,7 +801,16 @@ impl Parser {
                 self.advance();
                 if self.match_token(&TokenKind::LeftParen) {
                     self.expect_token(&TokenKind::LeftParen)?;
-                    return self.parse_function_call(&identifier, start);
+                    return self.parse_function_call(
+                        Box::new(Spanned {
+                            node: Expression::Identifier(identifier),
+                            span: Span {
+                                start,
+                                end: token.end,
+                            },
+                        }),
+                        start,
+                    );
                 }
                 Ok(Spanned {
                     node: Expression::Identifier(identifier),
@@ -552,7 +821,7 @@ impl Parser {
                 })
             }
             _ => Err(format!(
-                "Unexpected token: {:?} at {}:{}",
+                "Unexpected token: '{:?}' at {}:{}",
                 token.kind, token.start.0, token.start.1
             )),
         }
@@ -600,7 +869,7 @@ impl Parser {
 
     fn parse_function_call(
         &mut self,
-        identifier: &str,
+        callee: Box<Expr>,
         start: (usize, usize),
     ) -> Result<Expr, String> {
         let mut arguments: Vec<Expr> = Vec::new();
@@ -631,10 +900,7 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::RightParen)?.end;
 
         Ok(Spanned {
-            node: Expression::FunctionCall {
-                name: identifier.to_string(),
-                arguments,
-            },
+            node: Expression::Call { callee, arguments },
             span: Span { start, end },
         })
     }
