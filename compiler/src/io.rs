@@ -2,8 +2,11 @@
 
 use std::{fs, io, path::PathBuf, process::Command};
 
-const CS_PATTERN: &str = r".*\.cs.*";
 const TEMP_DIR: &str = "__tmp__cs_runtime";
+
+static BUILTINS_FILE: &[u8] = include_bytes!("../cs_runtime/Builtins.cs");
+static CSPROJ_FILE: &[u8] = include_bytes!("../cs_runtime/cs_runtime.csproj");
+static TYPES_FILE: &[u8] = include_bytes!("../cs_runtime/Types.cs");
 
 #[rustfmt::skip]
 const DOTNET_RID: &str = {
@@ -19,38 +22,26 @@ fn get_cwd() -> io::Result<PathBuf> {
     std::env::current_dir()
 }
 
-fn get_exe_dir() -> io::Result<PathBuf> {
-    std::env::current_exe().map(|p| {
-        p.parent()
-            .expect("Could not get executable's directory")
-            .to_path_buf()
-    })
-}
-
 pub fn copy_runtime() {
-    let exe: PathBuf = get_exe_dir().expect("Failed to get executable directory");
     let cwd: PathBuf = get_cwd().expect("Failed to get current working directory");
-    let runtime_src: PathBuf = exe.join("cs_runtime");
-    let runtime_dest: PathBuf = cwd.join(TEMP_DIR);
+    let dest: PathBuf = cwd.join(TEMP_DIR);
+    let mut target: PathBuf;
 
-    fs::create_dir_all(&runtime_dest).expect("Failed to create runtime destination directory");
+    fs::create_dir_all(&dest).expect("Failed to create runtime destination directory");
 
-    let pattern: regex::Regex =
-        regex::Regex::new(CS_PATTERN).expect("Failed to compile regex pattern");
+    target = dest.join("Builtins.cs");
+    if !target.exists() {
+        fs::write(&target, BUILTINS_FILE).expect("Failed to write runtime file");
+    }
 
-    // Copy all *.cs* files
-    for entry in fs::read_dir(&runtime_src).expect("Failed to read runtime source directory") {
-        let entry: fs::DirEntry = entry.expect("Failed to get directory entry");
-        let name: String = entry.file_name().to_string_lossy().to_string();
+    target = dest.join("Types.cs");
+    if !target.exists() {
+        fs::write(&target, TYPES_FILE).expect("Failed to write runtime file");
+    }
 
-        if !pattern.is_match(&name) {
-            continue;
-        }
-
-        let file_src: PathBuf = runtime_src.join(&name);
-        let file_dest: PathBuf = runtime_dest.join(&name);
-
-        fs::copy(file_src, file_dest).expect("Failed to copy runtime file");
+    target = dest.join("cs_runtime.csproj");
+    if !target.exists() {
+        fs::write(&target, CSPROJ_FILE).expect("Failed to write runtime file");
     }
 }
 
