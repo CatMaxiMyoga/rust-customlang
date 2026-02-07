@@ -110,6 +110,8 @@ pub enum Statement {
         type_: String,
         /// The name of the field.
         name: String,
+        /// Static field or not.
+        static_: bool,
     },
     /// Variable/Member assignment statement.
     Assignment {
@@ -146,6 +148,8 @@ pub enum Statement {
         parameters: Vec<(String, String)>,
         /// The body of the function.
         body: Vec<Stmt>,
+        /// Static method or not.
+        static_: bool,
     },
     /// If statement.
     If {

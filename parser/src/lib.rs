@@ -16,7 +16,7 @@ pub struct Parser {
     index: usize,
     outside_global_scope: bool,
     inside_class: Option<String>,
-    inside_static_method: bool, // Not yet implemented
+    inside_static: bool,
 }
 
 impl Parser {
@@ -39,7 +39,7 @@ impl Parser {
             index: 0,
             outside_global_scope: false,
             inside_class: None,
-            inside_static_method: false,
+            inside_static: false,
         };
 
         let mut statements: Vec<Stmt> = Vec::new();
@@ -284,6 +284,7 @@ impl Parser {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn parse_keyworded(&mut self) -> Result<Stmt, String> {
         let kind: TokenKind = self.peek()?.kind.clone();
         match kind {
@@ -317,7 +318,7 @@ impl Parser {
                     let start: (usize, usize) = token.start;
                     let end: (usize, usize) = token.end;
 
-                    if self.inside_class.is_some() && !self.inside_static_method {
+                    if self.inside_class.is_some() && !self.inside_static {
                         Ok(Spanned {
                             node: Statement::Expression(Spanned {
                                 node: Expression::Self_,
@@ -356,6 +357,40 @@ impl Parser {
                             })
                         },
                     )
+                }
+                Keyword::Static => {
+                    self.inside_static = true;
+
+                    if self.inside_class.is_none() {
+                        return Err(format!(
+                            "The 'static' keyword can only be used inside a class at {}:{}",
+                            self.peek()?.start.0,
+                            self.peek()?.start.1
+                        ));
+                    }
+
+                    let token: Token = self
+                        .expect_token(&TokenKind::Keyword(Keyword::Static))?
+                        .clone();
+                    let stmt: Stmt = self.parse_statement()?;
+
+                    match &stmt.node {
+                        Statement::MethodDeclaration { .. }
+                        | Statement::FieldDeclaration { .. } => {
+                            self.inside_static = true;
+                            Ok(Spanned {
+                                node: stmt.node,
+                                span: Span {
+                                    start: token.start,
+                                    end: stmt.span.end,
+                                },
+                            })
+                        }
+                        _ => Err(format!(
+                            "The 'static' keyword can only be used on method and {}{}:{}",
+                            " declarations at ", token.start.0, token.start.1
+                        )),
+                    }
                 }
             },
             _ => unreachable!(),
@@ -491,7 +526,7 @@ impl Parser {
 
         self.outside_global_scope = true;
         self.inside_class = Some(identifier.clone());
-        self.inside_static_method = false;
+        self.inside_static = false;
 
         let mut body: Vec<Stmt> = Vec::new();
         while !self.match_token(&TokenKind::RightBrace) {
@@ -501,7 +536,7 @@ impl Parser {
 
         self.outside_global_scope = false;
         self.inside_class = None;
-        self.inside_static_method = false;
+        self.inside_static = false;
 
         Ok(Spanned {
             node: Statement::ClassDeclaration {
@@ -561,7 +596,11 @@ impl Parser {
 
         let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
         Ok(Spanned {
-            node: Statement::FieldDeclaration { type_, name },
+            node: Statement::FieldDeclaration {
+                type_,
+                name,
+                static_: self.inside_static,
+            },
             span: Span { start, end },
         })
     }
@@ -601,6 +640,7 @@ impl Parser {
                     name,
                     parameters,
                     body,
+                    static_: self.inside_static,
                 },
                 span: Span {
                     start: token.start,
