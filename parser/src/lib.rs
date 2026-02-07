@@ -339,20 +339,23 @@ impl Parser {
                     let start: (usize, usize) = token.start;
                     let end: (usize, usize) = token.end;
 
-                    if let Some(class_name) = &self.inside_class {
-                        Ok(Spanned {
-                            node: Statement::Expression(Spanned {
-                                node: Expression::SelfType(class_name.clone()),
+                    self.inside_class.as_ref().map_or_else(
+                        || {
+                            Err(format!(
+                                "Illegal use of 'Self' outside class at {}:{}",
+                                start.0, start.1
+                            ))
+                        },
+                        |class_name| {
+                            Ok(Spanned {
+                                node: Statement::Expression(Spanned {
+                                    node: Expression::SelfType(class_name.clone()),
+                                    span: Span { start, end },
+                                }),
                                 span: Span { start, end },
-                            }),
-                            span: Span { start, end },
-                        })
-                    } else {
-                        Err(format!(
-                            "Illegal use of 'Self' outside class at {}:{}",
-                            start.0, start.1
-                        ))
-                    }
+                            })
+                        },
+                    )
                 }
             },
             _ => unreachable!(),
@@ -487,7 +490,7 @@ impl Parser {
         self.expect_token(&TokenKind::LeftBrace)?;
 
         self.outside_global_scope = true;
-        self.inside_class.is_some() = true;
+        self.inside_class = Some(identifier.clone());
         self.inside_static_method = false;
 
         let mut body: Vec<Stmt> = Vec::new();
@@ -497,7 +500,7 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
 
         self.outside_global_scope = false;
-        self.inside_class.is_some() = false;
+        self.inside_class = None;
         self.inside_static_method = false;
 
         Ok(Spanned {
