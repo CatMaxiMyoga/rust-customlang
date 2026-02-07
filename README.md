@@ -1,6 +1,6 @@
 # Customlang
 
-**Updated last: 06/12/2025** *(Up-To-Date)*
+**Updated last: 06/12/2025** _(Outdated)_
 
 I'm making my own custom lexer, parser and compiler in Rust.
 
@@ -63,7 +63,7 @@ I'm making my own custom lexer, parser and compiler in Rust.
 
 String literals can be created using the typical `"text"` syntax.
 
-```"Hello";```
+`"Hello";`
 
 Strings also support all common escape sequences (and a few less common ones,
 like `"\a"`). All supported escape sequences are:
@@ -102,7 +102,7 @@ Integer literals can be created by just typing an integer (currently only
 supports positive integer literals, to use a negative integer literal, write
 `0-#` where # is the absolute value)
 
-```123;```
+`123;`
 
 Integers implement all 4 currently existing [operators](#operators).
 
@@ -147,7 +147,7 @@ float.
 >> 2.5
 ```
 
-*Dividing by zero, whether integer or float, will result in an error.*
+_Dividing by zero, whether integer or float, will result in an error._
 
 ### Floating-Point Numbers
 
@@ -176,7 +176,7 @@ result in a float.
 Note that simply doing `5.` is **not** allowed and in fact **invalid**. instead,
 do `5.0`.
 
-*Dividing by zero, whether integer or float, will result in an error.*
+_Dividing by zero, whether integer or float, will result in an error._
 
 ### Booleans
 
@@ -241,8 +241,8 @@ String y;
 y = "Hello";
 ```
 
-*Identifiers holding functions **cannot** be used as variable names, as function
-variables are not allowed to be overwritten!*
+_Identifiers holding functions **cannot** be used as variable names, as function
+variables are not allowed to be overwritten!_
 
 ### Variable Reassignment
 
@@ -265,8 +265,8 @@ x = "Hello";
 >> Error: TypeMismatch
 ```
 
-*Identifiers holding functions **cannot** be reassigned, as function variables
-are not allowed to be overwritten!*
+_Identifiers holding functions **cannot** be reassigned, as function variables
+are not allowed to be overwritten!_
 
 ### Variable Shadowing
 
@@ -282,8 +282,8 @@ String x = "Hello";
 Note that the old variable will not exist anymore, meaning in the above example
 `5` is lost forever.
 
-*Identifiers holding functions **cannot** be used as variable names, as function
-variables are not allowed to be overwritten!*
+_Identifiers holding functions **cannot** be used as variable names, as function
+variables are not allowed to be overwritten!_
 
 ## Types
 
@@ -323,8 +323,8 @@ only use it inside functions. If the function has no `return`, the return type
 has to be `Void`. This type is not allowed to be assigned to variables or
 operated on.
 
-*Note that the function cannot use an identifier that's already been used as a
-variable, no matter what type that variable may hold.*
+_Note that the function cannot use an identifier that's already been used as a
+variable, no matter what type that variable may hold._
 
 ### Function Call
 
@@ -681,7 +681,7 @@ while (i < 10) {
     println(intToString(i)+" ");
     i = i + 1;
 }
->> 0 1 2 3 4 5 6 7 8 9 
+>> 0 1 2 3 4 5 6 7 8 9
 ```
 
 Or use another variable:
@@ -693,7 +693,7 @@ while (i < max) {
     println(intToString(i)+" ");
     i = i + 1;
 }
->> 0 1 2 3 4 5 6 7 8 9 
+>> 0 1 2 3 4 5 6 7 8 9
 ```
 
 In both of these cases the loop runs 10 times, starting at 0 and stopping when
