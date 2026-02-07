@@ -15,7 +15,7 @@ pub struct Parser {
     tokens: Vec<Token>,
     index: usize,
     outside_global_scope: bool,
-    inside_class: bool,
+    inside_class: Option<String>,
     inside_static_method: bool, // Not yet implemented
 }
 
@@ -38,7 +38,7 @@ impl Parser {
             tokens,
             index: 0,
             outside_global_scope: false,
-            inside_class: false,
+            inside_class: None,
             inside_static_method: false,
         };
 
@@ -317,7 +317,7 @@ impl Parser {
                     let start: (usize, usize) = token.start;
                     let end: (usize, usize) = token.end;
 
-                    if self.inside_class && !self.inside_static_method {
+                    if self.inside_class.is_some() && !self.inside_static_method {
                         Ok(Spanned {
                             node: Statement::Expression(Spanned {
                                 node: Expression::Self_,
@@ -328,6 +328,28 @@ impl Parser {
                     } else {
                         Err(format!(
                             "Illegal use of 'self' outside class instance methods at {}:{}",
+                            start.0, start.1
+                        ))
+                    }
+                }
+                Keyword::SelfType => {
+                    let token: Token = self
+                        .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
+                        .clone();
+                    let start: (usize, usize) = token.start;
+                    let end: (usize, usize) = token.end;
+
+                    if let Some(class_name) = &self.inside_class {
+                        Ok(Spanned {
+                            node: Statement::Expression(Spanned {
+                                node: Expression::SelfType(class_name.clone()),
+                                span: Span { start, end },
+                            }),
+                            span: Span { start, end },
+                        })
+                    } else {
+                        Err(format!(
+                            "Illegal use of 'Self' outside class at {}:{}",
                             start.0, start.1
                         ))
                     }
@@ -465,7 +487,7 @@ impl Parser {
         self.expect_token(&TokenKind::LeftBrace)?;
 
         self.outside_global_scope = true;
-        self.inside_class = true;
+        self.inside_class.is_some() = true;
         self.inside_static_method = false;
 
         let mut body: Vec<Stmt> = Vec::new();
@@ -475,7 +497,7 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
 
         self.outside_global_scope = false;
-        self.inside_class = false;
+        self.inside_class.is_some() = false;
         self.inside_static_method = false;
 
         Ok(Spanned {
@@ -488,7 +510,7 @@ impl Parser {
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
-        if self.inside_class {
+        if self.inside_class.is_some() {
             return self.parse_field_declaration();
         }
         let token: Token = self.peek()?.clone();
@@ -569,7 +591,7 @@ impl Parser {
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
         self.outside_global_scope = outside_global_scope_backup;
 
-        if self.inside_class {
+        if self.inside_class.is_some() {
             Ok(Spanned {
                 node: Statement::MethodDeclaration {
                     return_type,

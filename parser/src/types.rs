@@ -88,6 +88,8 @@ pub enum Expression {
     },
     /// Special expression representing the current class instance.
     Self_,
+    /// Special expression representing the current class' type. Contains the class name.
+    SelfType(String),
 }
 
 /// Represents statements in the AST.
