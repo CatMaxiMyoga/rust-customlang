@@ -9,6 +9,7 @@ pub struct Lexer {
     index: usize,
     line: usize,
     column: usize,
+    inside_comment: bool,
 }
 
 impl Lexer {
@@ -25,6 +26,7 @@ impl Lexer {
             index: 0,
             line: 1,
             column: 1,
+            inside_comment: false,
         };
 
         let mut tokens: Vec<Token> = vec![];
@@ -74,6 +76,19 @@ impl Lexer {
         if let Some(next_char) = self.source.get(self.index + 1) {
             let double_string: String = format!("{}{}", current_char, *next_char);
             let double_str: &str = double_string.as_str();
+
+            if !self.inside_comment && double_str == "/*" {
+                self.index += 2;
+                self.inside_comment = true;
+                return Ok(true);
+            } else if self.inside_comment && double_str == "*/" {
+                self.index += 2;
+                self.inside_comment = false;
+                return Ok(true);
+            } else if self.inside_comment {
+                self.index += 1;
+                return Ok(true);
+            }
 
             double = match double_str {
                 ">=" => Some(TokenKind::GreaterThanOrEqual),
