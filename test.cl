@@ -60,18 +60,23 @@ printBool(floatToBool(2.5));
 
 println("");
 
-
 class X {
+  /* Field - accessed via .<fieldname> */
   int x;
 
-  Self X(int a) {
+  /* Constructor - called via .new(<args>) */
+  static Self X(int a) { 
     x = a;
+    return self;
   }
 
+  /* Method - called via .<methodname>(<args>) */
   void printX() {
-    println("X(" + intToString(x) + ")");
+    /* FIXME: Parser error: Expected ',' or ')', found 'Dot' at 72:36 */
+    /* println("X(" + intToString(self.x) + ")"); */
   }
 }
 
 X y = X.new(10);
 y.printX();
+printInt(y.x);

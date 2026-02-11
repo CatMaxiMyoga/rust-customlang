@@ -13,7 +13,15 @@ impl Compiler {
     pub fn compile(cs_code: &str, output_file: Option<String>) {
         io::copy_runtime();
         io::write_file(cs_code);
-        io::call_compiler();
+        if !io::call_compiler() {
+            #[cfg(not(debug_assertions))]
+            {
+                println!();
+                eprintln!("Dotnet publish command failed, cleaning up temporary files...");
+                io::cleanup_temp_files();
+            }
+            std::process::exit(1);
+        }
         io::cleanup_temp_files();
 
         #[rustfmt::skip]

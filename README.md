@@ -1,6 +1,6 @@
 # Customlang
 
-**Updated last: 06/12/2025** _(Outdated)_
+**Updated last: 06/12/2025** _(Outdated - does not include classes and comments)_
 
 I'm making my own custom lexer, parser and compiler in Rust.
 
