@@ -349,19 +349,16 @@ impl Parser {
                     }
                 }
                 Keyword::SelfType => {
+                    let token: Token = self
+                        .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
+                        .clone();
+
                     if self.inside_class.is_none() {
-                        let token: Token = self
-                            .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
-                            .clone();
                         return Err(format!(
                             "Illegal use of 'Self' outside class at {}:{}",
                             token.start.0, token.start.1
                         ));
                     }
-
-                    let token: Token = self
-                        .expect_token(&TokenKind::Keyword(Keyword::SelfType))?
-                        .clone();
 
                     if matches!(self.peek()?.kind, TokenKind::Identifier(_)) {
                         self.advance();
@@ -633,7 +630,8 @@ impl Parser {
 
     fn parse_function_declaration(&mut self) -> Result<Stmt, String> {
         let token: Token = self.peek()?.clone();
-        let return_type: String = match &token.kind {
+
+        let mut return_type: String = match &token.kind {
             TokenKind::Identifier(name) => name.clone(),
             TokenKind::Keyword(Keyword::SelfType) => {
                 self.inside_class.as_ref().expect("checked before").into()
@@ -647,6 +645,13 @@ impl Parser {
             _ => unreachable!(),
         };
         self.advance();
+
+        if let Some(class_name) = &self.inside_class
+            && class_name == &return_type
+            && class_name == &name
+        {
+            return_type.clear();
+        }
 
         self.expect_token(&TokenKind::LeftParen)?;
         let parameters: Vec<(String, String)> = self.parse_function_declaration_parameters()?;

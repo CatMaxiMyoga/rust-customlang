@@ -14,6 +14,7 @@ impl Type {
             "float" => String::from("CustomLang.Types.rmm_Float"),
             "bool" => String::from("CustomLang.Types.rmm_Bool"),
             "void" => String::from("void"),
+            "" => String::new(),
             x => prefix(x),
         }
     }

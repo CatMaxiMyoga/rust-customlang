@@ -53,7 +53,7 @@ pub fn write_file(cs_code: &str) {
     fs::write(file_path, cs_code).expect("Failed to write C# code to file");
 }
 
-pub fn call_compiler() {
+pub fn call_compiler() -> bool {
     let cwd: PathBuf = get_cwd().expect("Failed to get current working directory");
     let runtime_dir: PathBuf = cwd.join(TEMP_DIR);
 
@@ -74,9 +74,10 @@ pub fn call_compiler() {
         .expect("Failed to execute dotnet publish command");
 
     if !status.success() {
-        eprintln!("Dotnet publish command failed with status: {status}");
-        std::process::exit(1);
+        return false;
     }
+
+    true
 }
 
 pub fn cleanup_temp_files() {

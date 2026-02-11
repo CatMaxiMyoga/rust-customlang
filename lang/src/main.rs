@@ -7,7 +7,7 @@ use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
 use transpiler::Transpiler;
 
-const LANGUAGE_EXTENSION: &str = "custom";
+const LANGUAGE_EXTENSION: &str = "cl";
 
 const USAGE: &str = r"
 
