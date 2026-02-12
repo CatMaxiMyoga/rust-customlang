@@ -67,16 +67,15 @@ class X {
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
     x = a;
-    return self;
   }
 
   /* Method - called via .<methodname>(<args>) */
   void printX() {
-    /* FIXME: Parser error: Expected ',' or ')', found 'Dot' at 72:36 */
-    /* println("X(" + intToString(self.x) + ")"); */
+    println("X(" + intToString(self.x) + ")");
   }
 }
 
 X y = X.new(10);
 y.printX();
 printInt(y.x);
+println("");

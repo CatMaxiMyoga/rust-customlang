@@ -646,12 +646,15 @@ impl Parser {
         };
         self.advance();
 
-        if let Some(class_name) = &self.inside_class
+        let constructor: bool = if let Some(class_name) = &self.inside_class
             && class_name == &return_type
             && class_name == &name
         {
             return_type.clear();
-        }
+            true
+        } else {
+            false
+        };
 
         self.expect_token(&TokenKind::LeftParen)?;
         let parameters: Vec<(String, String)> = self.parse_function_declaration_parameters()?;
@@ -674,7 +677,7 @@ impl Parser {
                     name,
                     parameters,
                     body,
-                    static_: self.inside_static,
+                    static_: self.inside_static && !constructor,
                 },
                 span: Span {
                     start: token.start,
@@ -938,13 +941,20 @@ impl Parser {
                 let token: Token = self
                     .expect_token(&TokenKind::Keyword(Keyword::Self_))?
                     .clone();
-                Ok(Spanned {
+
+                let mut expr: Expr = Spanned {
                     node: Expression::Self_,
                     span: Span {
                         start: token.start,
                         end: token.end,
                     },
-                })
+                };
+
+                if self.peek()?.kind == TokenKind::Dot {
+                    expr = self.parse_postfix_chain(expr, token.start)?;
+                }
+
+                Ok(expr)
             }
             _ => Err(format!(
                 "Unexpected token: '{:?}' at {}:{}",
