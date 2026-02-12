@@ -1,6 +1,10 @@
 //! IO Operations for the Compiler
 
-use std::{fs, io, path::PathBuf, process::Command};
+use std::{
+    fs, io,
+    path::PathBuf,
+    process::{Command, ExitStatus},
+};
 
 const TEMP_DIR: &str = "__tmp__cs_runtime";
 
@@ -58,7 +62,7 @@ pub fn call_compiler() -> bool {
     let runtime_dir: PathBuf = cwd.join(TEMP_DIR);
 
     #[rustfmt::skip]
-    let status = Command::new("dotnet")
+    let status: ExitStatus = Command::new("dotnet")
         .args([
             "publish",
             "-c", "Release",
