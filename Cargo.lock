@@ -28,6 +28,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "semantics"
+version = "0.1.0"
+
+[[package]]
 name = "transpiler"
 version = "0.1.0"
 dependencies = [
