@@ -4,6 +4,21 @@ use std::collections::HashMap;
 
 use crate::errors::SemanticError;
 
+/// Represents the result of analyzing a statement, which does not have a type.
+pub type StatementReturn = Result<(), SemanticError>;
+
+/// Represents the result of analyzing an expression, which has a type which will be returned.
+pub type ExpressionReturn = Result<Type, SemanticError>;
+
+/// Represents a variable's state and type
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Variable {
+    /// The variable's type
+    pub var_type: Type,
+    /// Whether or not the variable has been initialized
+    pub initialized: bool,
+}
+
 /// Represents a function
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
@@ -41,6 +56,47 @@ pub enum Type {
     Void,
     /// Represents a user-defined class, like `class MyClass { ... }`
     Class(String),
+    /// Represents the current class' type inside the class
+    SelfType,
+}
+
+impl From<Type> for String {
+    fn from(val: Type) -> Self {
+        match val {
+            Type::Int => "int".to_string(),
+            Type::Float => "float".to_string(),
+            Type::Boolean => "bool".to_string(),
+            Type::String => "string".to_string(),
+            Type::Void => "void".to_string(),
+            Type::Class(class_name) => class_name,
+            Type::SelfType => "self".to_string(),
+        }
+    }
+}
+
+impl From<&str> for Type {
+    fn from(value: &str) -> Self {
+        match value {
+            "int" => Self::Int,
+            "float" => Self::Float,
+            "bool" => Self::Boolean,
+            "string" => Self::String,
+            "void" => Self::Void,
+            class_name => Self::Class(class_name.to_string()),
+        }
+    }
+}
+
+impl From<&String> for Type {
+    fn from(value: &String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+
+impl From<String> for Type {
+    fn from(value: String) -> Self {
+        Self::from(value.as_str())
+    }
 }
 
 /// Represents a scope containing all variables and functions defined in it as well as the parent
@@ -48,7 +104,7 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope {
     parent: Option<Box<Scope>>,
-    variables: HashMap<String, Type>,
+    variables: HashMap<String, Variable>,
     functions: HashMap<String, Function>,
     classes: HashMap<String, Class>,
 }
@@ -79,8 +135,41 @@ impl Scope {
     ///   the current scope.
     pub fn add_variable(&mut self, name: String, var_type: Type) -> Result<(), SemanticError> {
         self.check_shadowing(&name, ShadowingCheck::Variable)?;
-        self.variables.insert(name, var_type);
+        self.variables.insert(
+            name,
+            Variable {
+                var_type,
+                initialized: false,
+            },
+        );
         Ok(())
+    }
+
+    /// Check if the assigned value's type matches the variable's type and mark the variable as
+    /// initialized if not already.
+    ///
+    /// # Parameters
+    /// - `name`: The name of the variable being assigned to.
+    /// - `value_type`: The type of the value being assigned to the variable.
+    ///
+    /// # Errors
+    /// - `SemanticError::TypeMismatch`: If the type of the value being assigned does not match the
+    ///   variable's type.
+    /// - `SemanticError::VariableNotFound`: If the variable is not found in the current scope or
+    ///   any parent scope.
+    /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
+    ///   initialized yet.
+    pub fn assign_variable(&mut self, name: &str, value_type: &Type) -> Result<(), SemanticError> {
+        let var_type: Type = self.get_variable(name)?;
+
+        if var_type == *value_type {
+            Ok(())
+        } else {
+            Err(SemanticError::VariableAssignmentTypeMismatch {
+                expected: var_type.into(),
+                found: value_type.clone().into(),
+            })
+        }
     }
 
     /// Get the type of a variable by its name, searching through parent scopes if necessary.
@@ -91,6 +180,8 @@ impl Scope {
     /// # Errors
     /// - `SemanticError::VariableNotFound`: If the variable is not found in the current scope or
     ///   any parent scope.
+    /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
+    ///   initialized yet.
     pub fn get_variable(&self, name: &str) -> Result<Type, SemanticError> {
         self.variables.get(name).map_or_else(
             || {
@@ -99,7 +190,13 @@ impl Scope {
                     |parent_scope| parent_scope.get_variable(name),
                 )
             },
-            |var_type| Ok(var_type.clone()),
+            |var| {
+                if var.initialized {
+                    Err(SemanticError::VariableUninitialized(name.to_string()))
+                } else {
+                    Ok(var.var_type.clone())
+                }
+            },
         )
     }
 

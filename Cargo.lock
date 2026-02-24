@@ -30,6 +30,9 @@ dependencies = [
 [[package]]
 name = "semantics"
 version = "0.1.0"
+dependencies = [
+ "parser",
+]
 
 [[package]]
 name = "transpiler"

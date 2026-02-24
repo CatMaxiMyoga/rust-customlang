@@ -15,6 +15,15 @@ pub enum SemanticError {
     /// User tried to access a variable that doesn't exist in the current scope or any parent
     /// scope.
     VariableNotFound(String),
+    /// User tried to access a variable that exists but hasn't been initialized yet.
+    VariableUninitialized(String),
+    /// User tried to assign a value of one type to a variable of a different type.
+    VariableAssignmentTypeMismatch {
+        /// The actually expected type of the variable being assigned to.
+        expected: String,
+        /// The type of the value that was being assigned to the variable.
+        found: String,
+    },
     /// User tried to access a function that doesn't exist in the current scope or any parent
     /// scope.
     FunctionNotFound(String),
