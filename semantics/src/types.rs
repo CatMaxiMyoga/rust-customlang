@@ -2,13 +2,13 @@
 
 use std::collections::HashMap;
 
-use crate::errors::SemanticErrorType;
+use crate::errors::{SemanticError, SemanticErrorType};
 
 /// Represents the result of analyzing a statement, which does not have a type.
-pub type StatementReturn = Result<(), SemanticErrorType>;
+pub type StatementReturn = Result<(), SemanticError>;
 
 /// Represents the result of analyzing an expression, which has a type which will be returned.
-pub type ExpressionReturn = Result<Type, SemanticErrorType>;
+pub type ExpressionReturn = Result<Type, SemanticError>;
 
 /// Represents expressions which can be used as lvalues in assignments.
 pub enum LValue {
@@ -161,10 +161,15 @@ impl Scope {
     /// - `var_type`: The type of the variable to add.
     ///
     /// # Errors
-    /// - `SemanticError::ShadowingFunction`: If a function with the same name already exists in
+    /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name already exists in
     ///   the current scope.
-    pub fn add_variable(&mut self, name: String, var_type: Type) -> Result<(), SemanticErrorType> {
-        self.check_shadowing(&name, ShadowingCheck::Variable)?;
+    pub fn add_variable(
+        &mut self,
+        name: String,
+        var_type: Type,
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        self.check_shadowing(&name, ShadowingCheck::Variable, loc)?;
         self.variables.insert(
             name,
             Variable {
@@ -183,25 +188,30 @@ impl Scope {
     /// - `value_type`: The type of the value being assigned to the variable.
     ///
     /// # Errors
-    /// - `SemanticError::TypeMismatch`: If the type of the value being assigned does not match the
+    /// - `SemanticErrorType::TypeMismatch`: If the type of the value being assigned does not match the
     ///   variable's type.
-    /// - `SemanticError::VariableNotFound`: If the variable is not found in the current scope or
+    /// - `SemanticErrorType::VariableNotFound`: If the variable is not found in the current scope or
     ///   any parent scope.
-    /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
+    /// - `SemanticErrorType::VariableUninitialized`: If the variable is found but hasn't been
     ///   initialized yet.
     pub fn assign_variable(
         &mut self,
         name: &str,
         value_type: &Type,
-    ) -> Result<(), SemanticErrorType> {
-        let var_type: Type = self.get_variable(name)?;
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        let var_type: Type = self.get_variable(name, loc)?;
 
         if var_type == *value_type {
             Ok(())
         } else {
-            Err(SemanticErrorType::VariableAssignmentTypeMismatch {
-                expected: var_type.into(),
-                found: value_type.clone().into(),
+            Err(SemanticError {
+                error_type: SemanticErrorType::VariableAssignmentTypeMismatch {
+                    expected: var_type.into(),
+                    found: value_type.clone().into(),
+                },
+                line: loc.0,
+                column: loc.1,
             })
         }
     }
@@ -212,26 +222,37 @@ impl Scope {
     /// - `name`: The name of the variable to look up.
     ///
     /// # Errors
-    /// - `SemanticError::VariableNotFound`: If the variable is not found in the current scope or
+    /// - `SemanticErrorType::VariableNotFound`: If the variable is not found in the current scope or
     ///   any parent scope.
-    /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
+    /// - `SemanticErrorType::VariableUninitialized`: If the variable is found but hasn't been
     ///   initialized yet.
-    pub fn get_variable(&self, name: &str) -> Result<Type, SemanticErrorType> {
-        self.variables.get(name).map_or_else(
-            || {
-                self.parent.as_ref().map_or_else(
-                    || Err(SemanticErrorType::VariableNotFound(name.to_string())),
-                    |parent_scope| parent_scope.get_variable(name),
-                )
-            },
-            |var| {
-                if var.initialized {
-                    Err(SemanticErrorType::VariableUninitialized(name.to_string()))
-                } else {
-                    Ok(var.var_type.clone())
-                }
-            },
-        )
+    pub fn get_variable(&self, name: &str, loc: (usize, usize)) -> Result<Type, SemanticError> {
+        self.variables
+            .get(name)
+            .map_or_else(
+                || {
+                    self.parent.as_ref().map_or_else(
+                        || Err(SemanticErrorType::VariableNotFound(name.to_string())),
+                        |parent_scope| {
+                            parent_scope
+                                .get_variable(name, loc)
+                                .map_err(|e| e.error_type)
+                        },
+                    )
+                },
+                |var| {
+                    if var.initialized {
+                        Err(SemanticErrorType::VariableUninitialized(name.to_string()))
+                    } else {
+                        Ok(var.var_type.clone())
+                    }
+                },
+            )
+            .map_err(|e| SemanticError {
+                error_type: e,
+                line: loc.0,
+                column: loc.1,
+            })
     }
 
     /// Add a function to the current scope.
@@ -241,16 +262,17 @@ impl Scope {
     /// - `function`: The function to add to the current scope.
     ///
     /// # Errors
-    /// - `SemanticError::ShadowingFunction`: If a function with the same name already exists in
+    /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name already exists in
     ///   the current scope.
-    /// - `SemanticError::ShadowingClass`: If a class with the same name as the function already
+    /// - `SemanticErrorType::ShadowingClass`: If a class with the same name as the function already
     ///   exists in the current scope.
     pub fn add_function(
         &mut self,
         name: String,
         function: Function,
-    ) -> Result<(), SemanticErrorType> {
-        self.check_shadowing(&name, ShadowingCheck::Function)?;
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        self.check_shadowing(&name, ShadowingCheck::Function, loc)?;
         self.functions.insert(name, function);
         Ok(())
     }
@@ -261,18 +283,29 @@ impl Scope {
     /// - `name`: The name of the function to look up.
     ///
     /// # Errors
-    /// - `SemanticError::FunctionNotFound`: If the function is not found in the current scope or
+    /// - `SemanticErrorType::FunctionNotFound`: If the function is not found in the current scope or
     ///   any parent scope
-    pub fn get_function(&self, name: &str) -> Result<Function, SemanticErrorType> {
-        self.functions.get(name).map_or_else(
-            || {
-                self.parent.as_ref().map_or_else(
-                    || Err(SemanticErrorType::FunctionNotFound(name.to_string())),
-                    |parent_scope| parent_scope.get_function(name),
-                )
-            },
-            |function| Ok(function.clone()),
-        )
+    pub fn get_function(&self, name: &str, loc: (usize, usize)) -> Result<Function, SemanticError> {
+        self.functions
+            .get(name)
+            .map_or_else(
+                || {
+                    self.parent.as_ref().map_or_else(
+                        || Err(SemanticErrorType::FunctionNotFound(name.to_string())),
+                        |parent_scope| {
+                            parent_scope
+                                .get_function(name, loc)
+                                .map_err(|e| e.error_type)
+                        },
+                    )
+                },
+                |function| Ok(function.clone()),
+            )
+            .map_err(|e| SemanticError {
+                error_type: e,
+                line: loc.0,
+                column: loc.1,
+            })
     }
 
     /// Add a class to the current scope.
@@ -281,12 +314,12 @@ impl Scope {
     /// - `class`: The class to add to the current scope.
     ///
     /// # Errors
-    /// - `SemanticError::ShadowingFunction`: If a function with the same name as the class already
+    /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name as the class already
     ///   exists in the current scope.
-    /// - `SemanticError::ShadowingClass`: If a class with the same name already exists in the
+    /// - `SemanticErrorType::ShadowingClass`: If a class with the same name already exists in the
     ///   current scope.
-    pub fn add_class(&mut self, class: Class) -> Result<(), SemanticErrorType> {
-        self.check_shadowing(&class.name, ShadowingCheck::Class)?;
+    pub fn add_class(&mut self, class: Class, loc: (usize, usize)) -> Result<(), SemanticError> {
+        self.check_shadowing(&class.name, ShadowingCheck::Class, loc)?;
         self.classes.insert(class.name.clone(), class);
         Ok(())
     }
@@ -297,18 +330,25 @@ impl Scope {
     /// - `name`: The name of the class to look up.
     ///
     /// # Errors
-    /// - `SemanticError::ClassNotFound`: If the class is not found in the current scope or any
+    /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
     ///   parent scope.
-    pub fn get_class(&self, name: &str) -> Result<Class, SemanticErrorType> {
-        self.classes.get(name).map_or_else(
-            || {
-                self.parent.as_ref().map_or_else(
-                    || Err(SemanticErrorType::ClassNotFound(name.to_string())),
-                    |parent| parent.get_class(name),
-                )
-            },
-            |class| Ok(class.clone()),
-        )
+    pub fn get_class(&self, name: &str, loc: (usize, usize)) -> Result<Class, SemanticError> {
+        self.classes
+            .get(name)
+            .map_or_else(
+                || {
+                    self.parent.as_ref().map_or_else(
+                        || Err(SemanticErrorType::ClassNotFound(name.to_string())),
+                        |parent| parent.get_class(name, loc).map_err(|e| e.error_type),
+                    )
+                },
+                |class| Ok(class.clone()),
+            )
+            .map_err(|e| SemanticError {
+                error_type: e,
+                line: loc.0,
+                column: loc.1,
+            })
     }
 
     /// Gets a class field by its name, searching through parent scopes if necessary.
@@ -318,23 +358,28 @@ impl Scope {
     /// - `field_name`: The name of the field in class `class_name` to look up.
     ///
     /// # Errors
-    /// - `SemanticError::ClassNotFound`: If the class is not found in the current scope or any
+    /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
     ///   parent scope.
-    /// - `SemanticError::FieldNotFound`: If the field is not found in the class definition.
+    /// - `SemanticErrorType::FieldNotFound`: If the field is not found in the class definition.
     pub fn get_class_field(
         &self,
         class_name: &str,
         field_name: &str,
-    ) -> Result<Type, SemanticErrorType> {
-        let class: Class = self.get_class(class_name)?;
+        loc: (usize, usize),
+    ) -> Result<Type, SemanticError> {
+        let class: Class = self.get_class(class_name, loc)?;
 
         class
             .fields
             .get(field_name)
             .cloned()
-            .ok_or_else(|| SemanticErrorType::FieldNotFound {
-                class: class_name.to_string(),
-                field: field_name.to_string(),
+            .ok_or_else(|| SemanticError {
+                error_type: SemanticErrorType::FieldNotFound {
+                    class: class_name.to_string(),
+                    field: field_name.to_string(),
+                },
+                line: loc.0,
+                column: loc.1,
             })
     }
 
@@ -345,23 +390,28 @@ impl Scope {
     /// - `method_name`: The name of the method in class `class_name` to look up.
     ///
     /// # Errors
-    /// - `SemanticError::ClassNotFound`: If the class is not found in the current scope or any
+    /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
     ///   parent scope.
-    /// - `SemanticError::MethodNotFound`: If the method is not found in the class definition.
+    /// - `SemanticErrorType::MethodNotFound`: If the method is not found in the class definition.
     pub fn get_class_method(
         &self,
         class_name: &str,
         method_name: &str,
-    ) -> Result<Function, SemanticErrorType> {
-        let class: Class = self.get_class(class_name)?;
+        loc: (usize, usize),
+    ) -> Result<Function, SemanticError> {
+        let class: Class = self.get_class(class_name, loc)?;
 
         class
             .methods
             .get(method_name)
             .cloned()
-            .ok_or_else(|| SemanticErrorType::MethodNotFound {
-                class: class_name.to_string(),
-                method: method_name.to_string(),
+            .ok_or_else(|| SemanticError {
+                error_type: SemanticErrorType::MethodNotFound {
+                    class: class_name.to_string(),
+                    method: method_name.to_string(),
+                },
+                line: loc.0,
+                column: loc.1,
             })
     }
 
@@ -369,17 +419,22 @@ impl Scope {
         &self,
         name: &str,
         check_type: ShadowingCheck,
-    ) -> Result<(), SemanticErrorType> {
-        if check_type != ShadowingCheck::Variable && self.variables.contains_key(name) {
-            return Err(SemanticErrorType::ShadowingVariable(name.to_string()));
-        }
-        if check_type != ShadowingCheck::Function && self.functions.contains_key(name) {
-            return Err(SemanticErrorType::ShadowingFunction(name.to_string()));
-        }
-        if check_type != ShadowingCheck::Class && self.classes.contains_key(name) {
-            return Err(SemanticErrorType::ShadowingClass(name.to_string()));
-        }
-        Ok(())
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        (if check_type != ShadowingCheck::Variable && self.variables.contains_key(name) {
+            Err(SemanticErrorType::ShadowingVariable(name.to_string()))
+        } else if check_type != ShadowingCheck::Function && self.functions.contains_key(name) {
+            Err(SemanticErrorType::ShadowingFunction(name.to_string()))
+        } else if check_type != ShadowingCheck::Class && self.classes.contains_key(name) {
+            Err(SemanticErrorType::ShadowingClass(name.to_string()))
+        } else {
+            Ok(())
+        })
+        .map_err(|e| SemanticError {
+            error_type: e,
+            line: loc.0,
+            column: loc.1,
+        })
     }
 }
 

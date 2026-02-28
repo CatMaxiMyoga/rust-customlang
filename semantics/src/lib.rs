@@ -1,9 +1,9 @@
 //! The semantic analysis crate for the custom language's AST.
 
-use parser::types::{BinaryOperator, Expr, Expression, Literal, Statement, Stmt};
+use parser::types::{BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt};
 
 use crate::{
-    errors::SemanticErrorType,
+    errors::SemanticError,
     types::{ExpressionReturn, LValue, Scope, StatementReturn, Type},
 };
 
@@ -36,11 +36,13 @@ impl SemanticAnalyzer {
     }
 
     fn statement(&mut self, stmt: Stmt) -> StatementReturn {
+        let loc: Span = stmt.span;
+        let loc: (usize, usize) = (loc.start.0, loc.start.1);
         match stmt.node {
             Statement::VariableDeclaration { type_, name, value } => {
-                self.variable_declaration(type_, &name, value)
+                self.variable_declaration(type_, &name, value, loc)
             }
-            Statement::Assignment { assignee, value } => self.assignment(*assignee, value),
+            Statement::Assignment { assignee, value } => self.assignment(*assignee, value, loc),
             _ => todo!(),
         }
     }
@@ -50,13 +52,14 @@ impl SemanticAnalyzer {
         var_type: String,
         name: &str,
         value: Option<Expr>,
+        loc: (usize, usize),
     ) -> StatementReturn {
         let var_type: Type = Type::from(var_type);
-        self.scope.add_variable(name.to_string(), var_type)?;
+        self.scope.add_variable(name.to_string(), var_type, loc)?;
 
         if let Some(value) = value {
-            let value_type: Type = self.expression(value)?;
-            self.scope.assign_variable(name, &value_type)?;
+            let value_type: Type = self.expression(value, loc)?;
+            self.scope.assign_variable(name, &value_type, loc)?;
         }
 
         Ok(())
@@ -66,9 +69,9 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn assignment(&mut self, assignee: Expr, value: Expr) -> StatementReturn {
-        let lvalue: LValue = self.resolve_lvalue(assignee)?;
-        let value_type: Type = self.expression(value)?;
+    fn assignment(&mut self, assignee: Expr, value: Expr, loc: (usize, usize)) -> StatementReturn {
+        let lvalue: LValue = self.resolve_lvalue(assignee, loc)?;
+        let value_type: Type = self.expression(value, loc)?;
         todo!()
     }
 
@@ -76,7 +79,7 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn resolve_lvalue(&self, expr: Expr) -> Result<LValue, SemanticErrorType> {
+    fn resolve_lvalue(&self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
         todo!()
     }
 
@@ -84,14 +87,14 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn expression(&mut self, expr: Expr) -> ExpressionReturn {
+    fn expression(&mut self, expr: Expr, loc: (usize, usize)) -> ExpressionReturn {
         match expr.node {
-            Expression::Literal(literal) => self.literal(literal),
+            Expression::Literal(literal) => self.literal(literal, loc),
             Expression::Binary {
                 left,
                 operator,
                 right,
-            } => self.binary(*left, operator, *right),
+            } => self.binary(*left, operator, *right, loc),
             _ => todo!(),
         }
     }
@@ -100,7 +103,7 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn literal(&self, literal: Literal) -> ExpressionReturn {
+    fn literal(&self, literal: Literal, loc: (usize, usize)) -> ExpressionReturn {
         todo!()
     }
 
@@ -108,7 +111,13 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn binary(&self, left: Expr, operator: BinaryOperator, right: Expr) -> ExpressionReturn {
+    fn binary(
+        &self,
+        left: Expr,
+        operator: BinaryOperator,
+        right: Expr,
+        loc: (usize, usize),
+    ) -> ExpressionReturn {
         todo!()
     }
 }
