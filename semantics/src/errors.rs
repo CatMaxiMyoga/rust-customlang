@@ -15,9 +15,9 @@ impl SemanticError {
     pub fn error_message(&self) -> String {
         let mut message: String = String::new();
 
-        message.push_str("SemanticAnalysisError: ");
+        message.push_str("SemanticError: ");
         message.push_str(self.error_type.error_name());
-        message.push_str("' at [");
+        message.push_str(" at [");
         message.push_str(&self.line.to_string());
         message.push_str(":");
         message.push_str(&self.column.to_string());

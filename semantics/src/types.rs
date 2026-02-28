@@ -2,13 +2,43 @@
 
 use std::collections::HashMap;
 
-use crate::errors::SemanticError;
+use crate::errors::SemanticErrorType;
 
 /// Represents the result of analyzing a statement, which does not have a type.
-pub type StatementReturn = Result<(), SemanticError>;
+pub type StatementReturn = Result<(), SemanticErrorType>;
 
 /// Represents the result of analyzing an expression, which has a type which will be returned.
-pub type ExpressionReturn = Result<Type, SemanticError>;
+pub type ExpressionReturn = Result<Type, SemanticErrorType>;
+
+/// Represents expressions which can be used as lvalues in assignments.
+pub enum LValue {
+    /// Represents a variable, a.k.a. an identifier to a non-function, non-class, declared
+    /// variable.
+    Variable {
+        /// The name of the variable.
+        name: String,
+        /// The type of the variable.
+        var_type: Type,
+    },
+    /// Represents a field of a class.
+    Field {
+        /// The type of the base expression.
+        base: Type,
+        /// The name of the field.
+        field_name: String,
+        /// The type of the field.
+        field_type: Type,
+    },
+    /// Represents a static field of a class.
+    StaticField {
+        /// The type of the class containing the static field.
+        class: Type,
+        /// The name of the static field.
+        field_name: String,
+        /// The type of the static field.
+        field_type: Type,
+    },
+}
 
 /// Represents a variable's state and type
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,7 +163,7 @@ impl Scope {
     /// # Errors
     /// - `SemanticError::ShadowingFunction`: If a function with the same name already exists in
     ///   the current scope.
-    pub fn add_variable(&mut self, name: String, var_type: Type) -> Result<(), SemanticError> {
+    pub fn add_variable(&mut self, name: String, var_type: Type) -> Result<(), SemanticErrorType> {
         self.check_shadowing(&name, ShadowingCheck::Variable)?;
         self.variables.insert(
             name,
@@ -159,13 +189,17 @@ impl Scope {
     ///   any parent scope.
     /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
     ///   initialized yet.
-    pub fn assign_variable(&mut self, name: &str, value_type: &Type) -> Result<(), SemanticError> {
+    pub fn assign_variable(
+        &mut self,
+        name: &str,
+        value_type: &Type,
+    ) -> Result<(), SemanticErrorType> {
         let var_type: Type = self.get_variable(name)?;
 
         if var_type == *value_type {
             Ok(())
         } else {
-            Err(SemanticError::VariableAssignmentTypeMismatch {
+            Err(SemanticErrorType::VariableAssignmentTypeMismatch {
                 expected: var_type.into(),
                 found: value_type.clone().into(),
             })
@@ -182,17 +216,17 @@ impl Scope {
     ///   any parent scope.
     /// - `SemanticError::VariableUninitialized`: If the variable is found but hasn't been
     ///   initialized yet.
-    pub fn get_variable(&self, name: &str) -> Result<Type, SemanticError> {
+    pub fn get_variable(&self, name: &str) -> Result<Type, SemanticErrorType> {
         self.variables.get(name).map_or_else(
             || {
                 self.parent.as_ref().map_or_else(
-                    || Err(SemanticError::VariableNotFound(name.to_string())),
+                    || Err(SemanticErrorType::VariableNotFound(name.to_string())),
                     |parent_scope| parent_scope.get_variable(name),
                 )
             },
             |var| {
                 if var.initialized {
-                    Err(SemanticError::VariableUninitialized(name.to_string()))
+                    Err(SemanticErrorType::VariableUninitialized(name.to_string()))
                 } else {
                     Ok(var.var_type.clone())
                 }
@@ -211,7 +245,11 @@ impl Scope {
     ///   the current scope.
     /// - `SemanticError::ShadowingClass`: If a class with the same name as the function already
     ///   exists in the current scope.
-    pub fn add_function(&mut self, name: String, function: Function) -> Result<(), SemanticError> {
+    pub fn add_function(
+        &mut self,
+        name: String,
+        function: Function,
+    ) -> Result<(), SemanticErrorType> {
         self.check_shadowing(&name, ShadowingCheck::Function)?;
         self.functions.insert(name, function);
         Ok(())
@@ -225,11 +263,11 @@ impl Scope {
     /// # Errors
     /// - `SemanticError::FunctionNotFound`: If the function is not found in the current scope or
     ///   any parent scope
-    pub fn get_function(&self, name: &str) -> Result<Function, SemanticError> {
+    pub fn get_function(&self, name: &str) -> Result<Function, SemanticErrorType> {
         self.functions.get(name).map_or_else(
             || {
                 self.parent.as_ref().map_or_else(
-                    || Err(SemanticError::FunctionNotFound(name.to_string())),
+                    || Err(SemanticErrorType::FunctionNotFound(name.to_string())),
                     |parent_scope| parent_scope.get_function(name),
                 )
             },
@@ -247,7 +285,7 @@ impl Scope {
     ///   exists in the current scope.
     /// - `SemanticError::ShadowingClass`: If a class with the same name already exists in the
     ///   current scope.
-    pub fn add_class(&mut self, class: Class) -> Result<(), SemanticError> {
+    pub fn add_class(&mut self, class: Class) -> Result<(), SemanticErrorType> {
         self.check_shadowing(&class.name, ShadowingCheck::Class)?;
         self.classes.insert(class.name.clone(), class);
         Ok(())
@@ -261,11 +299,11 @@ impl Scope {
     /// # Errors
     /// - `SemanticError::ClassNotFound`: If the class is not found in the current scope or any
     ///   parent scope.
-    pub fn get_class(&self, name: &str) -> Result<Class, SemanticError> {
+    pub fn get_class(&self, name: &str) -> Result<Class, SemanticErrorType> {
         self.classes.get(name).map_or_else(
             || {
                 self.parent.as_ref().map_or_else(
-                    || Err(SemanticError::ClassNotFound(name.to_string())),
+                    || Err(SemanticErrorType::ClassNotFound(name.to_string())),
                     |parent| parent.get_class(name),
                 )
             },
@@ -287,14 +325,14 @@ impl Scope {
         &self,
         class_name: &str,
         field_name: &str,
-    ) -> Result<Type, SemanticError> {
+    ) -> Result<Type, SemanticErrorType> {
         let class: Class = self.get_class(class_name)?;
 
         class
             .fields
             .get(field_name)
             .cloned()
-            .ok_or_else(|| SemanticError::FieldNotFound {
+            .ok_or_else(|| SemanticErrorType::FieldNotFound {
                 class: class_name.to_string(),
                 field: field_name.to_string(),
             })
@@ -314,28 +352,32 @@ impl Scope {
         &self,
         class_name: &str,
         method_name: &str,
-    ) -> Result<Function, SemanticError> {
+    ) -> Result<Function, SemanticErrorType> {
         let class: Class = self.get_class(class_name)?;
 
         class
             .methods
             .get(method_name)
             .cloned()
-            .ok_or_else(|| SemanticError::MethodNotFound {
+            .ok_or_else(|| SemanticErrorType::MethodNotFound {
                 class: class_name.to_string(),
                 method: method_name.to_string(),
             })
     }
 
-    fn check_shadowing(&self, name: &str, check_type: ShadowingCheck) -> Result<(), SemanticError> {
+    fn check_shadowing(
+        &self,
+        name: &str,
+        check_type: ShadowingCheck,
+    ) -> Result<(), SemanticErrorType> {
         if check_type != ShadowingCheck::Variable && self.variables.contains_key(name) {
-            return Err(SemanticError::ShadowingVariable(name.to_string()));
+            return Err(SemanticErrorType::ShadowingVariable(name.to_string()));
         }
         if check_type != ShadowingCheck::Function && self.functions.contains_key(name) {
-            return Err(SemanticError::ShadowingFunction(name.to_string()));
+            return Err(SemanticErrorType::ShadowingFunction(name.to_string()));
         }
         if check_type != ShadowingCheck::Class && self.classes.contains_key(name) {
-            return Err(SemanticError::ShadowingClass(name.to_string()));
+            return Err(SemanticErrorType::ShadowingClass(name.to_string()));
         }
         Ok(())
     }
