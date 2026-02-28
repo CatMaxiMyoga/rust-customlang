@@ -12,6 +12,8 @@ pub struct SemanticError {
 }
 
 impl SemanticError {
+    /// Returns the full error message.
+    #[must_use]
     pub fn error_message(&self) -> String {
         let mut message: String = String::new();
 
@@ -19,12 +21,17 @@ impl SemanticError {
         message.push_str(self.error_type.error_name());
         message.push_str(" at [");
         message.push_str(&self.line.to_string());
-        message.push_str(":");
+        message.push(':');
         message.push_str(&self.column.to_string());
         message.push_str("]: ");
         message.push_str(&self.error_type.message());
 
         message
+    }
+
+    /// Prints the error message to stderr.
+    pub fn print(&self) {
+        eprintln!("{}", self.error_message());
     }
 }
 
@@ -75,6 +82,7 @@ pub enum SemanticErrorType {
 
 impl SemanticErrorType {
     /// Returns a human-readable error message describing the semantic error.
+    #[must_use]
     pub fn message(&self) -> String {
         match self {
             Self::ShadowingVariable(var) => Self::one_var_message(
@@ -137,18 +145,19 @@ impl SemanticErrorType {
     }
 
     fn one_var_message(part1: &str, var: &str, part2: &str) -> String {
-        format!("{} '{}' {}", part1, var, part2)
+        format!("{part1} '{var}' {part2}")
     }
 
     fn two_var_message(part1: &str, var1: &str, part2: &str, var2: &str, part3: &str) -> String {
         if part3.is_empty() {
-            format!("{} '{}' {} '{}'", part1, var1, part2, var2)
+            format!("{part1} '{var1}' {part2} '{var2}'")
         } else {
-            format!("{} '{}' {} '{}' {}", part1, var1, part2, var2, part3)
+            format!("{part1} '{var1}' {part2} '{var2}' {part3}")
         }
     }
 
     /// Returns the name of the error type as a string.
+    #[must_use]
     pub const fn error_name(&self) -> &'static str {
         match self {
             Self::ShadowingVariable(_) => "ShadowingVariable",
