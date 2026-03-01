@@ -1,6 +1,6 @@
 //! The semantic analysis crate for the custom language's AST.
 
-use parser::types::{BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt};
+use parser::types::{Expr, Expression, Span, Statement, Stmt};
 
 use crate::{
     errors::{SemanticError, SemanticErrorType},
@@ -102,7 +102,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn resolve_lvalue(&mut self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
+    fn resolve_lvalue(&self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
         match expr.node {
             Expression::Identifier(name) => {
                 self.scope.get_local_variable(&name, loc)?;
@@ -140,10 +140,6 @@ impl SemanticAnalyzer {
         }
     }
 
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
     fn function_declaration(
         &mut self,
         return_type: &str,
@@ -194,40 +190,10 @@ impl SemanticAnalyzer {
     }
 
     // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn expression(&mut self, expr: Expr, loc: (usize, usize)) -> ExpressionReturn {
-        match expr.node {
-            Expression::Literal(literal) => self.literal(literal, loc),
-            Expression::Binary {
-                left,
-                operator,
-                right,
-            } => self.binary(*left, operator, *right, loc),
-            _ => todo!(),
-        }
-    }
-
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
-    fn literal(&self, literal: Literal, loc: (usize, usize)) -> ExpressionReturn {
-        todo!()
-    }
-
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
-    fn binary(
-        &self,
-        left: Expr,
-        operator: BinaryOperator,
-        right: Expr,
-        loc: (usize, usize),
-    ) -> ExpressionReturn {
+    fn expression(&self, expr: Expr, loc: (usize, usize)) -> ExpressionReturn {
         todo!()
     }
 }
