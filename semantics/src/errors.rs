@@ -78,6 +78,11 @@ pub enum SemanticErrorType {
         /// The name of the method that was being accessed inside `class`.
         method: String,
     },
+    /// User tried to assign to an expression that is not a valid lvalue.
+    InvalidAssignmentTarget(String),
+    /// User tried to assign to an instance field without storing the instance in a variable first,
+    /// which is not allowed.
+    IllegalInstanceFieldAssignment(String),
 }
 
 impl SemanticErrorType {
@@ -141,6 +146,16 @@ impl SemanticErrorType {
                 class,
                 "",
             ),
+            Self::InvalidAssignmentTarget(target) => Self::one_var_message(
+                "Tried to assign to expression",
+                target,
+                "which is not a valid assignment target (lvalue)",
+            ),
+            Self::IllegalInstanceFieldAssignment(field) => Self::one_var_message(
+                "Tried to assign to instance field",
+                field,
+                "without storing the instance in a variable first, which is not allowed",
+            ),
         }
     }
 
@@ -170,6 +185,8 @@ impl SemanticErrorType {
             Self::ClassNotFound(_) => "ClassNotFound",
             Self::FieldNotFound { .. } => "FieldNotFound",
             Self::MethodNotFound { .. } => "MethodNotFound",
+            Self::InvalidAssignmentTarget(_) => "InvalidAssignmentTarget",
+            Self::IllegalInstanceFieldAssignment(_) => "IllegalInstanceFieldAssignment",
         }
     }
 }

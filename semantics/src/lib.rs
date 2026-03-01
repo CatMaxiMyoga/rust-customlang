@@ -3,8 +3,8 @@
 use parser::types::{BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt};
 
 use crate::{
-    errors::SemanticError,
-    types::{ExpressionReturn, LValue, Scope, StatementReturn, Type},
+    errors::{SemanticError, SemanticErrorType},
+    types::{Class, ExpressionReturn, Field, Function, LValue, Scope, StatementReturn, Type},
 };
 
 pub mod errors;
@@ -12,6 +12,7 @@ pub mod types;
 
 /// Analyzes the AST for semantic correctness, such as type checking and scope resolution (later on)
 pub struct SemanticAnalyzer {
+    function_return: Option<Type>,
     scope: Scope,
 }
 
@@ -26,6 +27,7 @@ impl SemanticAnalyzer {
     pub fn analyze(ast: parser::types::Program) -> StatementReturn {
         let mut analyzer: Self = Self {
             scope: Scope::new(None),
+            function_return: None,
         };
 
         for statement in ast.statements {
@@ -40,16 +42,28 @@ impl SemanticAnalyzer {
         let loc: (usize, usize) = (loc.start.0, loc.start.1);
         match stmt.node {
             Statement::VariableDeclaration { type_, name, value } => {
-                self.variable_declaration(type_, &name, value, loc)
+                self.variable_declaration(&type_, &name, value, loc)
             }
             Statement::Assignment { assignee, value } => self.assignment(*assignee, value, loc),
+            Statement::FunctionDeclaration {
+                return_type,
+                name,
+                parameters,
+                body,
+            } => self.function_declaration(&return_type, &name, parameters, body, loc),
+            Statement::FieldDeclaration { .. } | Statement::MethodDeclaration { .. } => {
+                unreachable!(
+                    "Field and Method declarations outside class declarations should be impossible."
+                )
+            }
+            // TODO: Add missing statements
             _ => todo!(),
         }
     }
 
     fn variable_declaration(
         &mut self,
-        var_type: String,
+        var_type: &str,
         name: &str,
         value: Option<Expr>,
         loc: (usize, usize),
@@ -65,22 +79,118 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
     fn assignment(&mut self, assignee: Expr, value: Expr, loc: (usize, usize)) -> StatementReturn {
         let lvalue: LValue = self.resolve_lvalue(assignee, loc)?;
         let value_type: Type = self.expression(value, loc)?;
-        todo!()
+
+        match lvalue {
+            LValue::Variable(name) => self.scope.assign_variable(&name, &value_type, loc),
+            LValue::Field { base, field_name } => {
+                let class: Class = self.scope.get_class(&(String::from(&base)), loc)?;
+                self.scope
+                    .assign_field(&class.name, &field_name, &value_type, loc)?;
+
+                Ok(())
+            }
+            LValue::StaticField { class, field_name } => {
+                let class: Class = self.scope.get_class(&(String::from(&class)), loc)?;
+                self.scope
+                    .assign_field(&class.name, &field_name, &value_type, loc)?;
+
+                Ok(())
+            }
+        }
+    }
+
+    fn resolve_lvalue(&mut self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
+        match expr.node {
+            Expression::Identifier(name) => {
+                self.scope.get_local_variable(&name, loc)?;
+                Ok(LValue::Variable(name))
+            }
+            Expression::MemberAccess { object, member } => {
+                let expr_type: Type = self.expression(object.as_ref().clone(), loc)?;
+                let field: Field =
+                    self.scope
+                        .get_class_field(&String::from(&expr_type), &member, loc)?;
+
+                if field.is_static {
+                    Ok(LValue::StaticField {
+                        class: expr_type,
+                        field_name: member,
+                    })
+                } else if matches!(object.node, Expression::Identifier(_)) {
+                    Ok(LValue::Field {
+                        base: expr_type,
+                        field_name: member,
+                    })
+                } else {
+                    Err(SemanticError {
+                        error_type: SemanticErrorType::IllegalInstanceFieldAssignment(member),
+                        line: loc.0,
+                        column: loc.1,
+                    })
+                }
+            }
+            e => Err(SemanticError {
+                error_type: SemanticErrorType::InvalidAssignmentTarget(e.name().to_string()),
+                line: loc.0,
+                column: loc.1,
+            }),
+        }
     }
 
     // TODO: Remove temporary allow attributes once implemented.
     #[allow(clippy::needless_pass_by_ref_mut)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(unused_variables)]
-    fn resolve_lvalue(&self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
-        todo!()
+    fn function_declaration(
+        &mut self,
+        return_type: &str,
+        name: &str,
+        parameters: Vec<(String, String)>,
+        body: Vec<Stmt>,
+        loc: (usize, usize),
+    ) -> StatementReturn {
+        if self.function_return.is_some() {
+            unreachable!("Nested functions are illegal and should have been caught by the parser");
+        }
+
+        let return_type: Type = Type::from(return_type);
+
+        let mut function_analyzer: Self = Self {
+            scope: Scope::new(Some(Box::new(self.scope.clone()))),
+            function_return: Some(return_type.clone()),
+        };
+
+        let mut param_types: Vec<Type> = Vec::new();
+
+        for (param_type, param_name) in parameters {
+            let param_type: Type = Type::from(&param_type);
+            function_analyzer
+                .scope
+                .add_variable(param_name.clone(), param_type.clone(), loc)?;
+            function_analyzer
+                .scope
+                .assign_variable(&param_name, &param_type, loc)?;
+            param_types.push(param_type);
+        }
+
+        for statement in body {
+            function_analyzer.statement(statement)?;
+        }
+
+        self.scope.add_function(
+            name.to_string(),
+            Function {
+                parameters: param_types,
+                return_type,
+                is_static: false,
+            },
+            loc,
+        )?;
+
+        Ok(())
     }
 
     // TODO: Remove temporary allow attributes once implemented.

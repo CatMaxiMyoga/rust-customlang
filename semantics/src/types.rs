@@ -12,22 +12,15 @@ pub type ExpressionReturn = Result<Type, SemanticError>;
 
 /// Represents expressions which can be used as lvalues in assignments.
 pub enum LValue {
-    /// Represents a variable, a.k.a. an identifier to a non-function, non-class, declared
+    /// Represents a variable, a.k.a. an identifier to a non-function, non-class, locally declared
     /// variable.
-    Variable {
-        /// The name of the variable.
-        name: String,
-        /// The type of the variable.
-        var_type: Type,
-    },
+    Variable(String),
     /// Represents a field of a class.
     Field {
         /// The type of the base expression.
         base: Type,
         /// The name of the field.
         field_name: String,
-        /// The type of the field.
-        field_type: Type,
     },
     /// Represents a static field of a class.
     StaticField {
@@ -35,8 +28,6 @@ pub enum LValue {
         class: Type,
         /// The name of the static field.
         field_name: String,
-        /// The type of the static field.
-        field_type: Type,
     },
 }
 
@@ -65,10 +56,20 @@ pub struct Function {
 pub struct Class {
     /// The name of the class
     pub name: String,
-    /// Fields defined in the class
-    pub fields: HashMap<String, Type>,
+    /// Fields defined in the class, storing type and whether or not they're static
+    pub fields: HashMap<String, Field>,
     /// Methods defined in the class
     pub methods: HashMap<String, Function>,
+}
+
+/// Represents a field in a class, storing the field's type, whether or not it is static, and
+/// whether or not it has been initialized (always true for static fields).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Field {
+    /// The type of the field
+    pub field_type: Type,
+    /// Whether or not the field is static
+    pub is_static: bool,
 }
 
 /// Represents a type in the language
@@ -90,15 +91,15 @@ pub enum Type {
     SelfType,
 }
 
-impl From<Type> for String {
-    fn from(val: Type) -> Self {
+impl From<&Type> for String {
+    fn from(val: &Type) -> Self {
         match val {
             Type::Int => "int".to_string(),
             Type::Float => "float".to_string(),
             Type::Boolean => "bool".to_string(),
             Type::String => "string".to_string(),
             Type::Void => "void".to_string(),
-            Type::Class(class_name) => class_name,
+            Type::Class(class_name) => class_name.clone(),
             Type::SelfType => "self".to_string(),
         }
     }
@@ -112,6 +113,7 @@ impl From<&str> for Type {
             "bool" => Self::Boolean,
             "string" => Self::String,
             "void" => Self::Void,
+            "Self" => Self::SelfType,
             class_name => Self::Class(class_name.to_string()),
         }
     }
@@ -119,12 +121,6 @@ impl From<&str> for Type {
 
 impl From<&String> for Type {
     fn from(value: &String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl From<String> for Type {
-    fn from(value: String) -> Self {
         Self::from(value.as_str())
     }
 }
@@ -159,6 +155,7 @@ impl Scope {
     /// # Parameters
     /// - `name`: The name of the variable to add.
     /// - `var_type`: The type of the variable to add.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name already exists in
@@ -186,6 +183,7 @@ impl Scope {
     /// # Parameters
     /// - `name`: The name of the variable being assigned to.
     /// - `value_type`: The type of the value being assigned to the variable.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::TypeMismatch`: If the type of the value being assigned does not match the
@@ -207,8 +205,8 @@ impl Scope {
         } else {
             Err(SemanticError {
                 error_type: SemanticErrorType::VariableAssignmentTypeMismatch {
-                    expected: var_type.into(),
-                    found: value_type.clone().into(),
+                    expected: (&var_type).into(),
+                    found: value_type.into(),
                 },
                 line: loc.0,
                 column: loc.1,
@@ -220,6 +218,7 @@ impl Scope {
     ///
     /// # Parameters
     /// - `name`: The name of the variable to look up.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::VariableNotFound`: If the variable is not found in the current scope or
@@ -255,11 +254,37 @@ impl Scope {
             })
     }
 
+    /// Get the type of a variable in the current scope by its name.
+    ///
+    /// # Parameters
+    /// - `name`: The name of the variable to look up.
+    /// - `loc`: Location in the source code, used for errors.
+    ///
+    /// # Errors
+    /// - `SemanticErrorType::VariableNotFound`: If the variable is not found in the current scope
+    pub fn get_local_variable(
+        &self,
+        name: &str,
+        loc: (usize, usize),
+    ) -> Result<Type, SemanticError> {
+        self.variables.get(name).map_or_else(
+            || {
+                Err(SemanticError {
+                    error_type: SemanticErrorType::VariableNotFound(name.to_string()),
+                    line: loc.0,
+                    column: loc.1,
+                })
+            },
+            |var| Ok(var.var_type.clone()),
+        )
+    }
+
     /// Add a function to the current scope.
     ///
     /// # Parameters
     /// - `name`: The name of the function to add.
     /// - `function`: The function to add to the current scope.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name already exists in
@@ -281,6 +306,7 @@ impl Scope {
     ///
     /// # Parameters
     /// - `name`: The name of the function to look up.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::FunctionNotFound`: If the function is not found in the current scope or
@@ -312,6 +338,7 @@ impl Scope {
     ///
     /// # Parameters
     /// - `class`: The class to add to the current scope.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::ShadowingFunction`: If a function with the same name as the class already
@@ -328,6 +355,7 @@ impl Scope {
     ///
     /// # Parameters
     /// - `name`: The name of the class to look up.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
@@ -356,6 +384,11 @@ impl Scope {
     /// # Parameters
     /// - `class_name`: The name of the class to look up.
     /// - `field_name`: The name of the field in class `class_name` to look up.
+    /// - `loc`: Location in the source code, used for errors.
+    ///
+    /// # Returns
+    /// The type of the field and whether or not the field is static (i.e. if it belongs to the
+    /// class instead of an instance of the class).
     ///
     /// # Errors
     /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
@@ -366,7 +399,7 @@ impl Scope {
         class_name: &str,
         field_name: &str,
         loc: (usize, usize),
-    ) -> Result<Type, SemanticError> {
+    ) -> Result<Field, SemanticError> {
         let class: Class = self.get_class(class_name, loc)?;
 
         class
@@ -388,6 +421,7 @@ impl Scope {
     /// # Parameters
     /// - `class_name`: The name of the class to look up.
     /// - `method_name`: The name of the method in class `class_name` to look up.
+    /// - `loc`: Location in the source code, used for errors.
     ///
     /// # Errors
     /// - `SemanticErrorType::ClassNotFound`: If the class is not found in the current scope or any
@@ -413,6 +447,41 @@ impl Scope {
                 line: loc.0,
                 column: loc.1,
             })
+    }
+
+    /// Check if the assigned value's type matches the field's type.
+    ///
+    /// # Parameters
+    /// - `class`: The name of the class containing the field being assigned to.
+    /// - `field_name`: The name of the field being assigned to.
+    /// - `value_type`: The type of the value being assigned to the field.
+    /// - `loc`: Location in the source code, used for errors.
+    ///
+    /// # Errors
+    /// - `SemanticErrorType::TypeMismatch`: If the type of the value being assigned to the field
+    ///   does not match the field's type.
+    /// - `SemanticErrorType::FieldNotFound`: If the field is not found in the class definition.
+    pub fn assign_field(
+        &mut self,
+        class: &str,
+        field_name: &str,
+        value_type: &Type,
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        let field: Field = self.get_class_field(class, field_name, loc)?;
+
+        if field.field_type == *value_type {
+            Ok(())
+        } else {
+            Err(SemanticError {
+                error_type: SemanticErrorType::VariableAssignmentTypeMismatch {
+                    expected: (&field.field_type).into(),
+                    found: value_type.into(),
+                },
+                line: loc.0,
+                column: loc.1,
+            })
+        }
     }
 
     fn check_shadowing(
