@@ -319,6 +319,7 @@ impl SemanticAnalyzer {
         method_info: MethodDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
+        // TODO: Implement next
         todo!()
     }
 
