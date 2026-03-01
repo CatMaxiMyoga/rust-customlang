@@ -258,13 +258,8 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(clippy::unused_self)]
-    #[allow(unused_variables)]
     fn field_declaration(
-        &mut self,
+        &self,
         fields: &mut HashMap<String, Field>,
         methods: &HashMap<String, Function>,
         field_info: FieldDeclarationInfo,
