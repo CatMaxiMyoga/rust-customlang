@@ -7,8 +7,8 @@ use parser::types::{Expr, Expression, Span, Statement, Stmt};
 use crate::{
     errors::{SemanticError, SemanticErrorType},
     types::{
-        Class, ExpressionReturn, Field, Function, LValue, MethodDeclarationInfo, Scope,
-        StatementReturn, Type,
+        Class, ExpressionReturn, Field, FieldDeclarationInfo, Function, LValue,
+        MethodDeclarationInfo, Scope, StatementReturn, Type,
     },
 };
 
@@ -210,7 +210,18 @@ impl SemanticAnalyzer {
                     type_,
                     name,
                     static_,
-                } => self.field_declaration(&mut fields, &type_, &name, static_, loc)?,
+                    value,
+                } => self.field_declaration(
+                    &mut fields,
+                    &methods,
+                    FieldDeclarationInfo {
+                        field_type: type_,
+                        name,
+                        static_,
+                        value,
+                    },
+                    loc,
+                )?,
                 Statement::MethodDeclaration {
                     return_type,
                     name,
@@ -219,6 +230,7 @@ impl SemanticAnalyzer {
                     static_,
                 } => self.method_declaration(
                     &mut methods,
+                    &fields,
                     MethodDeclarationInfo {
                         return_type,
                         name,
@@ -254,12 +266,50 @@ impl SemanticAnalyzer {
     fn field_declaration(
         &mut self,
         fields: &mut HashMap<String, Field>,
-        field_type: &str,
-        name: &str,
-        static_: bool,
+        methods: &HashMap<String, Function>,
+        field_info: FieldDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
-        todo!()
+        if fields.contains_key(&field_info.name) {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::DuplicateField(field_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        } else if methods.contains_key(&field_info.name) {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::FieldMethodNameConflict(field_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
+        let field_type: Type = Type::from(&field_info.field_type);
+
+        if let Some(value) = field_info.value {
+            let value_type: Type = self.expression(value, loc)?;
+
+            if field_type != value_type {
+                return Err(SemanticError {
+                    error_type: SemanticErrorType::FieldInitializationTypeMismatch {
+                        expected: (&field_type).into(),
+                        found: (&value_type).into(),
+                    },
+                    line: loc.0,
+                    column: loc.1,
+                });
+            }
+        }
+
+        fields.insert(
+            field_info.name,
+            Field {
+                field_type,
+                is_static: field_info.static_,
+            },
+        );
+
+        Ok(())
     }
 
     // TODO: Remove temporary allow attributes once implemented.
@@ -270,6 +320,7 @@ impl SemanticAnalyzer {
     fn method_declaration(
         &mut self,
         methods: &mut HashMap<String, Function>,
+        fields: &HashMap<String, Field>,
         method_info: MethodDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {

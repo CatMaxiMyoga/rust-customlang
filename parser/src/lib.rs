@@ -617,15 +617,34 @@ impl Parser {
         };
         self.advance();
 
-        let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
-        Ok(Spanned {
-            node: Statement::FieldDeclaration {
-                type_,
-                name,
-                static_: self.inside_static,
-            },
-            span: Span { start, end },
-        })
+        let mut value: Option<Expr> = None;
+
+        if self.inside_static {
+            self.expect_token(&TokenKind::Equals)?;
+            value = Some(self.parse_expression()?);
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+
+            Ok(Spanned {
+                node: Statement::FieldDeclaration {
+                    type_,
+                    name,
+                    value,
+                    static_: true,
+                },
+                span: Span { start, end },
+            })
+        } else {
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+            Ok(Spanned {
+                node: Statement::FieldDeclaration {
+                    type_,
+                    name,
+                    value,
+                    static_: self.inside_static,
+                },
+                span: Span { start, end },
+            })
+        }
     }
 
     fn parse_function_declaration(&mut self) -> Result<Stmt, String> {

@@ -106,9 +106,10 @@ impl Transpiler {
                 type_,
                 name,
                 static_,
+                value,
             } => {
                 self.indent();
-                self.field_declaration_statement(&type_, &name, static_);
+                self.field_declaration_statement(&type_, &name, static_, value)?;
             }
             Statement::FunctionDeclaration {
                 return_type,
@@ -185,7 +186,13 @@ impl Transpiler {
         Ok(())
     }
 
-    fn field_declaration_statement(&mut self, type_: &str, name: &str, static_: bool) {
+    fn field_declaration_statement(
+        &mut self,
+        type_: &str,
+        name: &str,
+        static_: bool,
+        value: Option<Expr>,
+    ) -> Result<(), String> {
         let type_: String = Type::from(type_.strip_prefix("##").unwrap_or(type_));
 
         self.output.push_str("public ");
@@ -195,6 +202,13 @@ impl Transpiler {
         self.output.push_str(&type_);
         self.output.push(' ');
         self.output.push_str(&prefix(name));
+
+        if let Some(val) = value {
+            self.output.push_str(" = ");
+            self.expression(val)?;
+        }
+
+        Ok(())
     }
 
     fn variable_assignment_statement(&mut self, assignee: Expr, value: Expr) -> Result<(), String> {

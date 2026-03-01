@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use parser::types::Stmt;
+use parser::types::{Expr, Stmt};
 
 use crate::errors::{SemanticError, SemanticErrorType};
 
@@ -24,6 +24,18 @@ pub struct MethodDeclarationInfo {
     pub body: Vec<Stmt>,
     /// Whether or not the method is static.
     pub static_: bool,
+}
+
+/// Holds information for the `field_declaration` method to avoid `too_many_arguments` lint.
+pub struct FieldDeclarationInfo {
+    /// The type of the field.
+    pub field_type: String,
+    /// The name of the field.
+    pub name: String,
+    /// Whether or not the field is static.
+    pub static_: bool,
+    /// The initial value of the field (if static).
+    pub value: Option<Expr>,
 }
 
 /// Represents expressions which can be used as lvalues in assignments.
@@ -468,7 +480,7 @@ impl Scope {
     /// Check if the assigned value's type matches the field's type.
     ///
     /// # Parameters
-    /// - `class`: The name of the class containing the field being assigned to.
+    /// - `class_name`: The name of the class containing the field being assigned to.
     /// - `field_name`: The name of the field being assigned to.
     /// - `value_type`: The type of the value being assigned to the field.
     /// - `loc`: Location in the source code, used for errors.
@@ -479,12 +491,12 @@ impl Scope {
     /// - `SemanticErrorType::FieldNotFound`: If the field is not found in the class definition.
     pub fn assign_field(
         &mut self,
-        class: &str,
+        class_name: &str,
         field_name: &str,
         value_type: &Type,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
-        let field: Field = self.get_class_field(class, field_name, loc)?;
+        let field: Field = self.get_class_field(class_name, field_name, loc)?;
 
         if field.field_type == *value_type {
             Ok(())

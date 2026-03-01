@@ -83,6 +83,19 @@ pub enum SemanticErrorType {
     /// User tried to assign to an instance field without storing the instance in a variable first,
     /// which is not allowed.
     IllegalInstanceFieldAssignment(String),
+    /// User tried to declare a field that already exists in the class.
+    DuplicateField(String),
+    /// User tried to declare a field that has the same name as an already existing method in the
+    /// class.
+    FieldMethodNameConflict(String),
+    /// User tried to initialize a static field at declaration with a value of a different type
+    /// than the field's declared type.
+    FieldInitializationTypeMismatch {
+        /// The actually expected type of the field being initialized to.
+        expected: String,
+        /// The type of the value that was being assigned to the field.
+        found: String,
+    },
 }
 
 impl SemanticErrorType {
@@ -156,6 +169,23 @@ impl SemanticErrorType {
                 field,
                 "without storing the instance in a variable first, which is not allowed",
             ),
+            Self::DuplicateField(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because a field with the same name already exists in the class",
+            ),
+            Self::FieldMethodNameConflict(name) => Self::one_var_message(
+                "Cannot declare field",
+                name,
+                "because a method with the same name already exists in the class",
+            ),
+            Self::FieldInitializationTypeMismatch { expected, found } => Self::two_var_message(
+                "Tried to initialize a static field at declaration with a value of type",
+                found,
+                "but the field's declared type is ",
+                expected,
+                "",
+            ),
         }
     }
 
@@ -187,6 +217,9 @@ impl SemanticErrorType {
             Self::MethodNotFound { .. } => "MethodNotFound",
             Self::InvalidAssignmentTarget(_) => "InvalidAssignmentTarget",
             Self::IllegalInstanceFieldAssignment(_) => "IllegalInstanceFieldAssignment",
+            Self::DuplicateField(_) => "DuplicateField",
+            Self::FieldMethodNameConflict(_) => "FieldMethodNameConflict",
+            Self::FieldInitializationTypeMismatch { .. } => "FieldInitializationTypeMismatch",
         }
     }
 }

@@ -124,6 +124,8 @@ pub enum Statement {
         type_: String,
         /// The name of the field.
         name: String,
+        /// The initial value of the field (if static).
+        value: Option<Expr>,
         /// Static field or not.
         static_: bool,
     },
