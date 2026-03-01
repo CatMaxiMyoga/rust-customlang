@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use parser::types::Stmt;
+
 use crate::errors::{SemanticError, SemanticErrorType};
 
 /// Represents the result of analyzing a statement, which does not have a type.
@@ -9,6 +11,20 @@ pub type StatementReturn = Result<(), SemanticError>;
 
 /// Represents the result of analyzing an expression, which has a type which will be returned.
 pub type ExpressionReturn = Result<Type, SemanticError>;
+
+/// Holds information for the `method_declaration` method to avoid `too_many_arguments` lint.
+pub struct MethodDeclarationInfo {
+    /// The return type of the method.
+    pub return_type: String,
+    /// The name of the method.
+    pub name: String,
+    /// The parameters of the method `(Type, Identifier)`.
+    pub parameters: Vec<(String, String)>,
+    /// The body of the method.
+    pub body: Vec<Stmt>,
+    /// Whether or not the method is static.
+    pub static_: bool,
+}
 
 /// Represents expressions which can be used as lvalues in assignments.
 pub enum LValue {

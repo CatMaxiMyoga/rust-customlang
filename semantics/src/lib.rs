@@ -1,10 +1,15 @@
 //! The semantic analysis crate for the custom language's AST.
 
+use std::collections::HashMap;
+
 use parser::types::{Expr, Expression, Span, Statement, Stmt};
 
 use crate::{
     errors::{SemanticError, SemanticErrorType},
-    types::{Class, ExpressionReturn, Field, Function, LValue, Scope, StatementReturn, Type},
+    types::{
+        Class, ExpressionReturn, Field, Function, LValue, MethodDeclarationInfo, Scope,
+        StatementReturn, Type,
+    },
 };
 
 pub mod errors;
@@ -51,6 +56,7 @@ impl SemanticAnalyzer {
                 parameters,
                 body,
             } => self.function_declaration(&return_type, &name, parameters, body, loc),
+            Statement::ClassDeclaration { name, body } => self.class_declaration(&name, body, loc),
             Statement::FieldDeclaration { .. } | Statement::MethodDeclaration { .. } => {
                 unreachable!(
                     "Field and Method declarations outside class declarations should be impossible."
@@ -187,6 +193,87 @@ impl SemanticAnalyzer {
         )?;
 
         Ok(())
+    }
+
+    fn class_declaration(
+        &mut self,
+        name: &str,
+        body: Vec<Stmt>,
+        loc: (usize, usize),
+    ) -> StatementReturn {
+        let mut fields: HashMap<String, Field> = HashMap::new();
+        let mut methods: HashMap<String, Function> = HashMap::new();
+
+        for statement in body {
+            match statement.node {
+                Statement::FieldDeclaration {
+                    type_,
+                    name,
+                    static_,
+                } => self.field_declaration(&mut fields, &type_, &name, static_, loc)?,
+                Statement::MethodDeclaration {
+                    return_type,
+                    name,
+                    parameters,
+                    body,
+                    static_,
+                } => self.method_declaration(
+                    &mut methods,
+                    MethodDeclarationInfo {
+                        return_type,
+                        name,
+                        parameters,
+                        body,
+                        static_,
+                    },
+                    loc,
+                )?,
+                _ => unreachable!(
+                    "The parser should only allow field and method declarations in calsses."
+                ),
+            }
+        }
+
+        self.scope.add_class(
+            Class {
+                name: name.to_owned(),
+                fields,
+                methods,
+            },
+            loc,
+        )?;
+
+        Ok(())
+    }
+
+    // TODO: Remove temporary allow attributes once implemented.
+    #[allow(clippy::needless_pass_by_ref_mut)]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::unused_self)]
+    #[allow(unused_variables)]
+    fn field_declaration(
+        &mut self,
+        fields: &mut HashMap<String, Field>,
+        field_type: &str,
+        name: &str,
+        static_: bool,
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        todo!()
+    }
+
+    // TODO: Remove temporary allow attributes once implemented.
+    #[allow(clippy::needless_pass_by_ref_mut)]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::unused_self)]
+    #[allow(unused_variables)]
+    fn method_declaration(
+        &mut self,
+        methods: &mut HashMap<String, Function>,
+        method_info: MethodDeclarationInfo,
+        loc: (usize, usize),
+    ) -> Result<(), SemanticError> {
+        todo!()
     }
 
     // TODO: Remove temporary allow attributes once implemented.
