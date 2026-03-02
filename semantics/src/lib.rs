@@ -232,6 +232,7 @@ impl SemanticAnalyzer {
                     &mut methods,
                     &fields,
                     MethodDeclarationInfo {
+                        class_name: name.to_string(),
                         return_type,
                         name,
                         parameters,
@@ -307,20 +308,78 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_ref_mut)]
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(clippy::unused_self)]
-    #[allow(unused_variables)]
     fn method_declaration(
-        &mut self,
+        &self,
         methods: &mut HashMap<String, Function>,
         fields: &HashMap<String, Field>,
         method_info: MethodDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
-        // TODO: Implement next
-        todo!()
+        if methods.contains_key(&method_info.name) {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::DuplicateMethod(method_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        } else if fields.contains_key(&method_info.name) {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::MethodFieldNameConflict(method_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
+        if self.function_return.is_some() {
+            unreachable!("Nested methods are illegal and should have been caught by the parser");
+        }
+
+        let return_type: Type = Type::from(&method_info.return_type);
+
+        let mut method_analyzer: Self = Self {
+            scope: Scope::new(Some(Box::new(self.scope.clone()))),
+            function_return: Some(return_type.clone()),
+        };
+
+        if !method_info.static_ {
+            method_analyzer.scope.add_variable(
+                "self".to_string(),
+                Type::Class(method_info.class_name.clone()),
+                loc,
+            )?;
+            method_analyzer.scope.assign_variable(
+                "self",
+                &Type::Class(method_info.class_name.clone()),
+                loc,
+            )?;
+        }
+
+        let mut param_types: Vec<Type> = Vec::new();
+
+        for (param_type, param_name) in method_info.parameters {
+            let param_type: Type = Type::from(&param_type);
+            method_analyzer
+                .scope
+                .add_variable(param_name.clone(), param_type.clone(), loc)?;
+            method_analyzer
+                .scope
+                .assign_variable(&param_name, &param_type, loc)?;
+            param_types.push(param_type);
+        }
+
+        for statement in method_info.body {
+            method_analyzer.statement(statement)?;
+        }
+
+        methods.insert(
+            method_info.name,
+            Function {
+                parameters: param_types,
+                return_type,
+                is_static: false,
+            },
+        );
+
+        Ok(())
     }
 
     // TODO: Remove temporary allow attributes once implemented.

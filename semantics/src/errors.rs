@@ -96,6 +96,11 @@ pub enum SemanticErrorType {
         /// The type of the value that was being assigned to the field.
         found: String,
     },
+    /// User tried to declare a method that already exists in the class.
+    DuplicateMethod(String),
+    /// User tried to declare a method that has the same name as an already existing field in the
+    /// class.
+    MethodFieldNameConflict(String),
 }
 
 impl SemanticErrorType {
@@ -186,6 +191,16 @@ impl SemanticErrorType {
                 expected,
                 "",
             ),
+            Self::DuplicateMethod(method) => Self::one_var_message(
+                "Cannot declare method",
+                method,
+                "because a method with the same name already exists in the class",
+            ),
+            Self::MethodFieldNameConflict(name) => Self::one_var_message(
+                "Cannot declare method",
+                name,
+                "because a field with the same name already exists in the class",
+            ),
         }
     }
 
@@ -220,6 +235,8 @@ impl SemanticErrorType {
             Self::DuplicateField(_) => "DuplicateField",
             Self::FieldMethodNameConflict(_) => "FieldMethodNameConflict",
             Self::FieldInitializationTypeMismatch { .. } => "FieldInitializationTypeMismatch",
+            Self::DuplicateMethod(_) => "DuplicateMethod",
+            Self::MethodFieldNameConflict(_) => "MethodFieldNameConflict",
         }
     }
 }

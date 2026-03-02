@@ -14,6 +14,8 @@ pub type ExpressionReturn = Result<Type, SemanticError>;
 
 /// Holds information for the `method_declaration` method to avoid `too_many_arguments` lint.
 pub struct MethodDeclarationInfo {
+    /// The class this method belongs to
+    pub class_name: String,
     /// The return type of the method.
     pub return_type: String,
     /// The name of the method.
