@@ -76,8 +76,9 @@ impl SemanticAnalyzer {
                 else_branch,
             } => self.if_statement(conditional_branches, else_branch, loc),
             Statement::While { condition, body } => self.while_statement(condition, body, loc),
+            Statement::Return(expr) => self.return_statement(expr, loc),
             // TODO: Add missing statements
-            _ => todo!(),
+            Statement::Expression(expr) => self.expression(expr, loc).map(|_| ()),
         }
     }
 
@@ -466,6 +467,51 @@ impl SemanticAnalyzer {
         }
 
         Ok(())
+    }
+
+    fn return_statement(&self, expr: Option<Expr>, loc: (usize, usize)) -> StatementReturn {
+        let function_return: Type = match &self.function_return {
+            Some(ret) => ret.clone(),
+            None => {
+                return Err(SemanticError {
+                    error_type: SemanticErrorType::IllegalReturn,
+                    line: loc.0,
+                    column: loc.1,
+                });
+            }
+        };
+
+        let has_expr: bool = expr.is_some();
+        let void_return: bool = function_return == Type::Void;
+
+        if has_expr == void_return {
+            Err(SemanticError {
+                error_type: SemanticErrorType::ReturnTypeMismatch {
+                    expected: (&function_return).into(),
+                    found: (&self.expression(expr.expect("Checked before"), loc)?).into(),
+                },
+                line: loc.0,
+                column: loc.1,
+            })
+        } else if has_expr {
+            let expr: Expr = expr.expect("Checked before");
+            let expr_type: Type = self.expression(expr, loc)?;
+
+            if expr_type == function_return {
+                Ok(())
+            } else {
+                Err(SemanticError {
+                    error_type: SemanticErrorType::ReturnTypeMismatch {
+                        expected: (&function_return).into(),
+                        found: (&expr_type).into(),
+                    },
+                    line: loc.0,
+                    column: loc.1,
+                })
+            }
+        } else {
+            Ok(())
+        }
     }
 
     // TODO: Remove temporary allow attributes once implemented.

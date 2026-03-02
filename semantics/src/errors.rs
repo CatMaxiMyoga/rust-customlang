@@ -107,6 +107,16 @@ pub enum SemanticErrorType {
     IllegalFunctionDeclaration(String),
     /// User tried to declare a class outside global scope, e.g. in an if statement.
     IllegalClassDeclaration(String),
+    /// User tried to return a value of a different type than the declared return type of the
+    /// function, or tried to return any value in a void-returning function.
+    ReturnTypeMismatch {
+        /// The actually expected return type of the function.
+        expected: String,
+        /// The type of the value that was being returned.
+        found: String,
+    },
+    /// User tried to return outside a function body.
+    IllegalReturn,
 }
 
 impl SemanticErrorType {
@@ -223,6 +233,14 @@ impl SemanticErrorType {
                 class,
                 "because classes can only be declared in global scope",
             ),
+            Self::ReturnTypeMismatch { expected, found } => Self::two_var_message(
+                "Tried to return a value of type",
+                found,
+                "but the function's declared return type is ",
+                expected,
+                "",
+            ),
+            Self::IllegalReturn => "Tried to return a value outside of a function body".to_string(),
         }
     }
 
@@ -262,6 +280,8 @@ impl SemanticErrorType {
             Self::NonBooleanCondition(_) => "NonBooleanCondition",
             Self::IllegalFunctionDeclaration(_) => "IllegalFunctionDeclaration",
             Self::IllegalClassDeclaration(_) => "IllegalClassDeclaration",
+            Self::ReturnTypeMismatch { .. } => "ReturnTypeMismatch",
+            Self::IllegalReturn => "IllegalReturn",
         }
     }
 }
