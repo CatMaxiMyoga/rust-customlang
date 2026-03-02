@@ -36,13 +36,13 @@ impl SemanticAnalyzer {
         };
 
         for statement in ast.statements {
-            analyzer.statement(statement)?;
+            analyzer.statement(statement, true)?;
         }
 
         Ok(())
     }
 
-    fn statement(&mut self, stmt: Stmt) -> StatementReturn {
+    fn statement(&mut self, stmt: Stmt, allows_definitions: bool) -> StatementReturn {
         let loc: Span = stmt.span;
         let loc: (usize, usize) = (loc.start.0, loc.start.1);
         match stmt.node {
@@ -55,13 +55,26 @@ impl SemanticAnalyzer {
                 name,
                 parameters,
                 body,
-            } => self.function_declaration(&return_type, &name, parameters, body, loc),
-            Statement::ClassDeclaration { name, body } => self.class_declaration(&name, body, loc),
+            } => self.function_declaration(
+                &return_type,
+                &name,
+                parameters,
+                body,
+                allows_definitions,
+                loc,
+            ),
+            Statement::ClassDeclaration { name, body } => {
+                self.class_declaration(&name, body, allows_definitions, loc)
+            }
             Statement::FieldDeclaration { .. } | Statement::MethodDeclaration { .. } => {
                 unreachable!(
                     "Field and Method declarations outside class declarations should be impossible."
                 )
             }
+            Statement::If {
+                conditional_branches,
+                else_branch,
+            } => self.if_statement(conditional_branches, else_branch, loc),
             // TODO: Add missing statements
             _ => todo!(),
         }
@@ -152,8 +165,17 @@ impl SemanticAnalyzer {
         name: &str,
         parameters: Vec<(String, String)>,
         body: Vec<Stmt>,
+        allowed: bool,
         loc: (usize, usize),
     ) -> StatementReturn {
+        if !allowed {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::IllegalFunctionDeclaration(name.to_string()),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
         if self.function_return.is_some() {
             unreachable!("Nested functions are illegal and should have been caught by the parser");
         }
@@ -179,7 +201,7 @@ impl SemanticAnalyzer {
         }
 
         for statement in body {
-            function_analyzer.statement(statement)?;
+            function_analyzer.statement(statement, false)?;
         }
 
         self.scope.add_function(
@@ -199,8 +221,17 @@ impl SemanticAnalyzer {
         &mut self,
         name: &str,
         body: Vec<Stmt>,
+        allowed: bool,
         loc: (usize, usize),
     ) -> StatementReturn {
+        if !allowed {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::IllegalClassDeclaration(name.to_string()),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
         let mut fields: HashMap<String, Field> = HashMap::new();
         let mut methods: HashMap<String, Function> = HashMap::new();
 
@@ -367,7 +398,7 @@ impl SemanticAnalyzer {
         }
 
         for statement in method_info.body {
-            method_analyzer.statement(statement)?;
+            method_analyzer.statement(statement, false)?;
         }
 
         methods.insert(
@@ -378,6 +409,37 @@ impl SemanticAnalyzer {
                 is_static: false,
             },
         );
+
+        Ok(())
+    }
+
+    fn if_statement(
+        &mut self,
+        conditional_branches: Vec<(Expr, Vec<Stmt>)>,
+        else_branch: Option<Vec<Stmt>>,
+        loc: (usize, usize),
+    ) -> StatementReturn {
+        for (condition, body) in conditional_branches {
+            let condition_type: Type = self.expression(condition, loc)?;
+
+            if condition_type != Type::Boolean {
+                return Err(SemanticError {
+                    error_type: SemanticErrorType::NonBooleanCondition((&condition_type).into()),
+                    line: loc.0,
+                    column: loc.1,
+                });
+            }
+
+            for statement in body {
+                self.statement(statement, false)?;
+            }
+        }
+
+        if let Some(else_body) = else_branch {
+            for statement in else_body {
+                self.statement(statement, false)?;
+            }
+        }
 
         Ok(())
     }

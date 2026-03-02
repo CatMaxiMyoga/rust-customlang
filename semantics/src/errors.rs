@@ -101,10 +101,17 @@ pub enum SemanticErrorType {
     /// User tried to declare a method that has the same name as an already existing field in the
     /// class.
     MethodFieldNameConflict(String),
+    /// User used a non-boolean expression as the condition in an if or while statement..
+    NonBooleanCondition(String),
+    /// User tried to declare a function outside global scope, e.g. in an if statement.
+    IllegalFunctionDeclaration(String),
+    /// User tried to declare a class outside global scope, e.g. in an if statement.
+    IllegalClassDeclaration(String),
 }
 
 impl SemanticErrorType {
     /// Returns a human-readable error message describing the semantic error.
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn message(&self) -> String {
         match self {
@@ -201,6 +208,21 @@ impl SemanticErrorType {
                 name,
                 "because a field with the same name already exists in the class",
             ),
+            Self::NonBooleanCondition(found) => Self::one_var_message(
+                "Tried to use non-boolean expression of type",
+                found,
+                "as the condition in an if or while statement",
+            ),
+            Self::IllegalFunctionDeclaration(func) => Self::one_var_message(
+                "Cannot declare function",
+                func,
+                "because functions can only be declared in global scope",
+            ),
+            Self::IllegalClassDeclaration(class) => Self::one_var_message(
+                "Cannot declare class",
+                class,
+                "because classes can only be declared in global scope",
+            ),
         }
     }
 
@@ -237,6 +259,9 @@ impl SemanticErrorType {
             Self::FieldInitializationTypeMismatch { .. } => "FieldInitializationTypeMismatch",
             Self::DuplicateMethod(_) => "DuplicateMethod",
             Self::MethodFieldNameConflict(_) => "MethodFieldNameConflict",
+            Self::NonBooleanCondition(_) => "NonBooleanCondition",
+            Self::IllegalFunctionDeclaration(_) => "IllegalFunctionDeclaration",
+            Self::IllegalClassDeclaration(_) => "IllegalClassDeclaration",
         }
     }
 }
