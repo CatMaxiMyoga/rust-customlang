@@ -75,6 +75,7 @@ impl SemanticAnalyzer {
                 conditional_branches,
                 else_branch,
             } => self.if_statement(conditional_branches, else_branch, loc),
+            Statement::While { condition, body } => self.while_statement(condition, body, loc),
             // TODO: Add missing statements
             _ => todo!(),
         }
@@ -439,6 +440,29 @@ impl SemanticAnalyzer {
             for statement in else_body {
                 self.statement(statement, false)?;
             }
+        }
+
+        Ok(())
+    }
+
+    fn while_statement(
+        &mut self,
+        condition: Expr,
+        body: Vec<Stmt>,
+        loc: (usize, usize),
+    ) -> StatementReturn {
+        let condition_type: Type = self.expression(condition, loc)?;
+
+        if condition_type != Type::Boolean {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::NonBooleanCondition((&condition_type).into()),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
+        for statement in body {
+            self.statement(statement, false)?;
         }
 
         Ok(())
