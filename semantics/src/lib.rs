@@ -532,6 +532,7 @@ impl SemanticAnalyzer {
 
         match expr.node {
             Expression::Literal(literal) => Ok(Self::literal(&literal)),
+            Expression::Identifier(identifier) => self.scope.get_variable(&identifier, loc),
             _ => todo!(),
         }
     }
