@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use parser::types::{Expr, Expression, Span, Statement, Stmt};
+use parser::types::{Expr, Expression, Literal, Span, Statement, Stmt};
 
 use crate::{
     errors::{SemanticError, SemanticErrorType},
@@ -528,6 +528,20 @@ impl SemanticAnalyzer {
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
     fn expression(&self, expr: Expr) -> ExpressionReturn {
-        todo!()
+        let loc: (usize, usize) = Self::get_loc(&expr.span);
+
+        match expr.node {
+            Expression::Literal(literal) => Ok(Self::literal(&literal)),
+            _ => todo!(),
+        }
+    }
+
+    const fn literal(literal: &Literal) -> Type {
+        match literal {
+            Literal::Integer(_) => Type::Int,
+            Literal::Float(_) => Type::Float,
+            Literal::Boolean(_) => Type::Boolean,
+            Literal::String(_) => Type::String,
+        }
     }
 }
