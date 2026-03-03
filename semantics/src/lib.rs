@@ -43,13 +43,12 @@ impl SemanticAnalyzer {
     }
 
     fn statement(&mut self, stmt: Stmt, allows_definitions: bool) -> StatementReturn {
-        let loc: Span = stmt.span;
-        let loc: (usize, usize) = (loc.start.0, loc.start.1);
+        let loc: (usize, usize) = Self::get_loc(&stmt.span);
         match stmt.node {
             Statement::VariableDeclaration { type_, name, value } => {
                 self.variable_declaration(&type_, &name, value, loc)
             }
-            Statement::Assignment { assignee, value } => self.assignment(*assignee, value, loc),
+            Statement::Assignment { assignee, value } => self.assignment(*assignee, value),
             Statement::FunctionDeclaration {
                 return_type,
                 name,
@@ -77,9 +76,13 @@ impl SemanticAnalyzer {
             } => self.if_statement(conditional_branches, else_branch, loc),
             Statement::While { condition, body } => self.while_statement(condition, body, loc),
             Statement::Return(expr) => self.return_statement(expr, loc),
-            // TODO: Add missing statements
-            Statement::Expression(expr) => self.expression(expr, loc).map(|_| ()),
+            Statement::Expression(expr) => self.expression(expr).map(|_| ()),
         }
+    }
+
+    #[must_use]
+    const fn get_loc(span: &Span) -> (usize, usize) {
+        (span.start.0, span.start.1)
     }
 
     fn variable_declaration(
@@ -93,44 +96,48 @@ impl SemanticAnalyzer {
         self.scope.add_variable(name.to_string(), var_type, loc)?;
 
         if let Some(value) = value {
-            let value_type: Type = self.expression(value, loc)?;
+            let value_type: Type = self.expression(value)?;
             self.scope.assign_variable(name, &value_type, loc)?;
         }
 
         Ok(())
     }
 
-    fn assignment(&mut self, assignee: Expr, value: Expr, loc: (usize, usize)) -> StatementReturn {
-        let lvalue: LValue = self.resolve_lvalue(assignee, loc)?;
-        let value_type: Type = self.expression(value, loc)?;
+    fn assignment(&mut self, assignee: Expr, value: Expr) -> StatementReturn {
+        let aloc: (usize, usize) = Self::get_loc(&assignee.span);
+
+        let lvalue: LValue = self.resolve_lvalue(assignee)?;
+        let value_type: Type = self.expression(value)?;
 
         match lvalue {
-            LValue::Variable(name) => self.scope.assign_variable(&name, &value_type, loc),
+            LValue::Variable(name) => self.scope.assign_variable(&name, &value_type, aloc),
             LValue::Field { base, field_name } => {
-                let class: Class = self.scope.get_class(&(String::from(&base)), loc)?;
+                let class: Class = self.scope.get_class(&(String::from(&base)), aloc)?;
                 self.scope
-                    .assign_field(&class.name, &field_name, &value_type, loc)?;
+                    .assign_field(&class.name, &field_name, &value_type, aloc)?;
 
                 Ok(())
             }
             LValue::StaticField { class, field_name } => {
-                let class: Class = self.scope.get_class(&(String::from(&class)), loc)?;
+                let class: Class = self.scope.get_class(&(String::from(&class)), aloc)?;
                 self.scope
-                    .assign_field(&class.name, &field_name, &value_type, loc)?;
+                    .assign_field(&class.name, &field_name, &value_type, aloc)?;
 
                 Ok(())
             }
         }
     }
 
-    fn resolve_lvalue(&self, expr: Expr, loc: (usize, usize)) -> Result<LValue, SemanticError> {
+    fn resolve_lvalue(&self, expr: Expr) -> Result<LValue, SemanticError> {
+        let loc: (usize, usize) = Self::get_loc(&expr.span);
+
         match expr.node {
             Expression::Identifier(name) => {
                 self.scope.get_local_variable(&name, loc)?;
                 Ok(LValue::Variable(name))
             }
             Expression::MemberAccess { object, member } => {
-                let expr_type: Type = self.expression(object.as_ref().clone(), loc)?;
+                let expr_type: Type = self.expression(object.as_ref().clone())?;
                 let field: Field =
                     self.scope
                         .get_class_field(&String::from(&expr_type), &member, loc)?;
@@ -238,6 +245,8 @@ impl SemanticAnalyzer {
         let mut methods: HashMap<String, Function> = HashMap::new();
 
         for statement in body {
+            let loc: (usize, usize) = Self::get_loc(&statement.span);
+
             match statement.node {
                 Statement::FieldDeclaration {
                     type_,
@@ -316,7 +325,7 @@ impl SemanticAnalyzer {
         let field_type: Type = Type::from(&field_info.field_type);
 
         if let Some(value) = field_info.value {
-            let value_type: Type = self.expression(value, loc)?;
+            let value_type: Type = self.expression(value)?;
 
             if field_type != value_type {
                 return Err(SemanticError {
@@ -422,7 +431,7 @@ impl SemanticAnalyzer {
         loc: (usize, usize),
     ) -> StatementReturn {
         for (condition, body) in conditional_branches {
-            let condition_type: Type = self.expression(condition, loc)?;
+            let condition_type: Type = self.expression(condition)?;
 
             if condition_type != Type::Boolean {
                 return Err(SemanticError {
@@ -452,7 +461,7 @@ impl SemanticAnalyzer {
         body: Vec<Stmt>,
         loc: (usize, usize),
     ) -> StatementReturn {
-        let condition_type: Type = self.expression(condition, loc)?;
+        let condition_type: Type = self.expression(condition)?;
 
         if condition_type != Type::Boolean {
             return Err(SemanticError {
@@ -488,14 +497,14 @@ impl SemanticAnalyzer {
             Err(SemanticError {
                 error_type: SemanticErrorType::ReturnTypeMismatch {
                     expected: (&function_return).into(),
-                    found: (&self.expression(expr.expect("Checked before"), loc)?).into(),
+                    found: (&self.expression(expr.expect("Checked before"))?).into(),
                 },
                 line: loc.0,
                 column: loc.1,
             })
         } else if has_expr {
             let expr: Expr = expr.expect("Checked before");
-            let expr_type: Type = self.expression(expr, loc)?;
+            let expr_type: Type = self.expression(expr)?;
 
             if expr_type == function_return {
                 Ok(())
@@ -518,7 +527,7 @@ impl SemanticAnalyzer {
     #[allow(clippy::needless_pass_by_value)]
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn expression(&self, expr: Expr, loc: (usize, usize)) -> ExpressionReturn {
+    fn expression(&self, expr: Expr) -> ExpressionReturn {
         todo!()
     }
 }
