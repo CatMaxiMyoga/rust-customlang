@@ -12,6 +12,7 @@ use crate::{
     },
 };
 
+pub mod builtin_types;
 pub mod errors;
 pub mod types;
 
@@ -242,7 +243,7 @@ impl SemanticAnalyzer {
         }
 
         let mut fields: HashMap<String, Field> = HashMap::new();
-        let mut methods: HashMap<String, Function> = HashMap::new();
+        let mut methods: HashMap<String, Vec<Function>> = HashMap::new();
 
         for statement in body {
             let loc: (usize, usize) = Self::get_loc(&statement.span);
@@ -304,7 +305,7 @@ impl SemanticAnalyzer {
     fn field_declaration(
         &self,
         fields: &mut HashMap<String, Field>,
-        methods: &HashMap<String, Function>,
+        methods: &HashMap<String, Vec<Function>>,
         field_info: FieldDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
@@ -352,18 +353,12 @@ impl SemanticAnalyzer {
 
     fn method_declaration(
         &self,
-        methods: &mut HashMap<String, Function>,
+        methods: &mut HashMap<String, Vec<Function>>,
         fields: &HashMap<String, Field>,
         method_info: MethodDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
-        if methods.contains_key(&method_info.name) {
-            return Err(SemanticError {
-                error_type: SemanticErrorType::DuplicateMethod(method_info.name),
-                line: loc.0,
-                column: loc.1,
-            });
-        } else if fields.contains_key(&method_info.name) {
+        if fields.contains_key(&method_info.name) {
             return Err(SemanticError {
                 error_type: SemanticErrorType::MethodFieldNameConflict(method_info.name),
                 line: loc.0,
@@ -412,14 +407,32 @@ impl SemanticAnalyzer {
             method_analyzer.statement(statement, false)?;
         }
 
-        methods.insert(
-            method_info.name,
-            Function {
-                parameters: param_types,
-                return_type,
-                is_static: false,
-            },
-        );
+        let method: Function = Function {
+            parameters: param_types,
+            return_type,
+            is_static: false,
+        };
+
+        // FIXME: fix this warning later
+        #[allow(clippy::map_entry)]
+        if methods.contains_key(&method_info.name) {
+            for m in &methods[&method_info.name] {
+                if m.parameters == method.parameters {
+                    return Err(SemanticError {
+                        error_type: SemanticErrorType::DuplicateMethod(method_info.name),
+                        line: loc.0,
+                        column: loc.1,
+                    });
+                }
+            }
+
+            methods
+                .get_mut(&method_info.name)
+                .expect("Checked before")
+                .push(method);
+        } else {
+            methods.insert(method_info.name, vec![method]);
+        }
 
         Ok(())
     }

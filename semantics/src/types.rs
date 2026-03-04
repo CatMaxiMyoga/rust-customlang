@@ -88,8 +88,8 @@ pub struct Class {
     pub name: String,
     /// Fields defined in the class, storing type and whether or not they're static
     pub fields: HashMap<String, Field>,
-    /// Methods defined in the class
-    pub methods: HashMap<String, Function>,
+    /// Methods defined in the class and their overloads
+    pub methods: HashMap<String, Vec<Function>>,
 }
 
 /// Represents a field in a class, storing the field's type, whether or not it is static, and
@@ -462,7 +462,7 @@ impl Scope {
         class_name: &str,
         method_name: &str,
         loc: (usize, usize),
-    ) -> Result<Function, SemanticError> {
+    ) -> Result<Vec<Function>, SemanticError> {
         let class: Class = self.get_class(class_name, loc)?;
 
         class

@@ -211,7 +211,8 @@ impl SemanticErrorType {
             Self::DuplicateMethod(method) => Self::one_var_message(
                 "Cannot declare method",
                 method,
-                "because a method with the same name already exists in the class",
+                &(String::from("because a method with the same name and parameter types")
+                    + " already exists in the class"),
             ),
             Self::MethodFieldNameConflict(name) => Self::one_var_message(
                 "Cannot declare method",
