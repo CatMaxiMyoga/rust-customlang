@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use parser::types::{Expr, Expression, Literal, Span, Statement, Stmt};
+use parser::types::{BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt};
 
 use crate::{
     errors::{SemanticError, SemanticErrorType},
@@ -559,6 +559,11 @@ impl SemanticAnalyzer {
         match expr.node {
             Expression::Literal(literal) => Ok(Self::literal(&literal)),
             Expression::Identifier(identifier) => self.scope.get_variable(&identifier, loc),
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => self.binary(*left, &operator, *right),
             _ => todo!(),
         }
     }
@@ -569,6 +574,47 @@ impl SemanticAnalyzer {
             Literal::Float(_) => Type::Float,
             Literal::Boolean(_) => Type::Boolean,
             Literal::String(_) => Type::String,
+        }
+    }
+
+    fn binary(&self, left: Expr, operator: &BinaryOperator, right: Expr) -> ExpressionReturn {
+        let lloc: (usize, usize) = Self::get_loc(&left.span);
+        let rloc: (usize, usize) = Self::get_loc(&right.span);
+
+        let ltype: Type = self.expression(left)?;
+        let rtype: Type = self.expression(right)?;
+
+        let op_name: String = format!(
+            "_bop{}",
+            match operator {
+                BinaryOperator::Add => "Add",
+                BinaryOperator::Subtract => "Sub",
+                BinaryOperator::Multiply => "Mul",
+                BinaryOperator::Divide => "Div",
+                BinaryOperator::Equals => "Eq",
+                BinaryOperator::NotEquals => "Ne",
+                BinaryOperator::LessThan => "Lt",
+                BinaryOperator::GreaterThan => "Gt",
+                BinaryOperator::LessThanOrEqual => "Le",
+                BinaryOperator::GreaterThanOrEqual => "Ge",
+                BinaryOperator::And => "And",
+                BinaryOperator::Or => "Or",
+            }
+        );
+
+        let lhs_func_name: String = format!("_bop{op_name}");
+        let rhs_func_name: String = format!("_bopR{op_name}");
+
+        let lclass: Class = self.scope.get_class(&String::from(&ltype), lloc)?;
+        let rclass: Class = self.scope.get_class(&String::from(&rtype), rloc)?;
+
+        if let Ok(method) = rclass.get_method(&lhs_func_name, &[ltype], rloc) {
+            Ok(method.return_type.clone())
+        } else {
+            Ok(lclass
+                .get_method(&rhs_func_name, &[rtype], lloc)?
+                .return_type
+                .clone())
         }
     }
 }

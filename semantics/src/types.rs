@@ -92,6 +92,36 @@ pub struct Class {
     pub methods: HashMap<String, Vec<Function>>,
 }
 
+impl Class {
+    /// Tries to get the method with the given name and parameter types from the class.
+    ///
+    /// # Errors
+    /// - `SemanticErrorType::MethodNotFound`: If no method with the given name and parameter types
+    ///   exists in the class definition.
+    pub fn get_method(
+        &self,
+        method_name: &str,
+        parameter_types: &[Type],
+        loc: (usize, usize),
+    ) -> Result<&Function, SemanticError> {
+        self.methods
+            .get(method_name)
+            .and_then(|methods: &Vec<Function>| {
+                methods
+                    .iter()
+                    .find(|m: &&Function| m.parameters == parameter_types)
+            })
+            .ok_or_else(|| SemanticError {
+                error_type: SemanticErrorType::MethodNotFound {
+                    class: self.name.clone(),
+                    method: method_name.into(),
+                },
+                line: loc.0,
+                column: loc.1,
+            })
+    }
+}
+
 /// Represents a field in a class, storing the field's type, whether or not it is static, and
 /// whether or not it has been initialized (always true for static fields).
 #[derive(Debug, Clone, PartialEq, Eq)]
