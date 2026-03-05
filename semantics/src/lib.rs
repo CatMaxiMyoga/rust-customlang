@@ -584,23 +584,20 @@ impl SemanticAnalyzer {
         let ltype: Type = self.expression(left)?;
         let rtype: Type = self.expression(right)?;
 
-        let op_name: String = format!(
-            "_bop{}",
-            match operator {
-                BinaryOperator::Add => "Add",
-                BinaryOperator::Subtract => "Sub",
-                BinaryOperator::Multiply => "Mul",
-                BinaryOperator::Divide => "Div",
-                BinaryOperator::Equals => "Eq",
-                BinaryOperator::NotEquals => "Ne",
-                BinaryOperator::LessThan => "Lt",
-                BinaryOperator::GreaterThan => "Gt",
-                BinaryOperator::LessThanOrEqual => "Le",
-                BinaryOperator::GreaterThanOrEqual => "Ge",
-                BinaryOperator::And => "And",
-                BinaryOperator::Or => "Or",
-            }
-        );
+        let op_name: &'static str = match operator {
+            BinaryOperator::Add => "Add",
+            BinaryOperator::Subtract => "Sub",
+            BinaryOperator::Multiply => "Mul",
+            BinaryOperator::Divide => "Div",
+            BinaryOperator::Equals => "Eq",
+            BinaryOperator::NotEquals => "Ne",
+            BinaryOperator::LessThan => "Lt",
+            BinaryOperator::GreaterThan => "Gt",
+            BinaryOperator::LessThanOrEqual => "Le",
+            BinaryOperator::GreaterThanOrEqual => "Ge",
+            BinaryOperator::And => "And",
+            BinaryOperator::Or => "Or",
+        };
 
         let lhs_func_name: String = format!("_bop{op_name}");
         let rhs_func_name: String = format!("_bopR{op_name}");
@@ -608,11 +605,11 @@ impl SemanticAnalyzer {
         let lclass: Class = self.scope.get_class(&String::from(&ltype), lloc)?;
         let rclass: Class = self.scope.get_class(&String::from(&rtype), rloc)?;
 
-        if let Ok(method) = rclass.get_method(&lhs_func_name, &[ltype], rloc) {
+        if let Ok(method) = rclass.get_method(&rhs_func_name, &[ltype], rloc) {
             Ok(method.return_type.clone())
         } else {
             Ok(lclass
-                .get_method(&rhs_func_name, &[rtype], lloc)?
+                .get_method(&lhs_func_name, &[rtype], lloc)?
                 .return_type
                 .clone())
         }
