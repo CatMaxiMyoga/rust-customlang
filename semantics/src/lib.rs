@@ -21,6 +21,7 @@ pub mod types;
 /// Analyzes the AST for semantic correctness, such as type checking and scope resolution (later on)
 pub struct SemanticAnalyzer {
     function_return: Option<Type>,
+    class: Option<Type>,
     scope: Scope,
 }
 
@@ -36,6 +37,7 @@ impl SemanticAnalyzer {
         let mut analyzer: Self = Self {
             scope: Scope::new(None),
             function_return: None,
+            class: None,
         };
 
         for statement in ast.statements {
@@ -197,6 +199,7 @@ impl SemanticAnalyzer {
         let mut function_analyzer: Self = Self {
             scope: Scope::new(Some(Box::new(self.scope.clone()))),
             function_return: Some(return_type.clone()),
+            class: None,
         };
 
         let mut param_types: Vec<Type> = Vec::new();
@@ -247,6 +250,7 @@ impl SemanticAnalyzer {
         let mut fields: HashMap<String, Field> = HashMap::new();
         let mut methods: HashMap<String, Vec<Function>> = HashMap::new();
 
+        self.class = Some(Type::Class(name.to_string()));
         for statement in body {
             let loc: (usize, usize) = Self::get_loc(&statement.span);
 
@@ -291,6 +295,7 @@ impl SemanticAnalyzer {
                 ),
             }
         }
+        self.class = None;
 
         self.scope.add_class(
             Class {
@@ -390,6 +395,7 @@ impl SemanticAnalyzer {
         let mut method_analyzer: Self = Self {
             scope: Scope::new(Some(Box::new(self.scope.clone()))),
             function_return: Some(return_type.clone()),
+            class: self.class.clone(),
         };
 
         if !method_info.static_ {
@@ -551,10 +557,6 @@ impl SemanticAnalyzer {
         }
     }
 
-    // TODO: Remove temporary allow attributes once implemented.
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(clippy::unused_self)]
-    #[allow(unused_variables)]
     fn expression(&self, expr: Expr) -> ExpressionReturn {
         let loc: (usize, usize) = Self::get_loc(&expr.span);
 
@@ -571,7 +573,11 @@ impl SemanticAnalyzer {
             Expression::MemberAccess { object, member } => {
                 self.member_access(*object, &member, loc)
             }
-            _ => todo!(),
+            Expression::Self_ => self
+                .class
+                .as_ref()
+                .ok_or_else(|| unreachable!("Should be caught by parser"))
+                .cloned(),
         }
     }
 
