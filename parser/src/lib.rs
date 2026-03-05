@@ -693,7 +693,11 @@ impl Parser {
             Ok(Spanned {
                 node: Statement::MethodDeclaration {
                     return_type,
-                    name,
+                    name: if constructor {
+                        self.inside_class.as_ref().expect("checked before").clone()
+                    } else {
+                        name
+                    },
                     parameters,
                     body,
                     static_: self.inside_static && !constructor,

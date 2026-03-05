@@ -117,6 +117,8 @@ pub enum SemanticErrorType {
     },
     /// User tried to return outside a function body.
     IllegalReturn,
+    /// User tried to declare a method with a non-allowed name, e.g. `new`.
+    IllegalMethodName(String),
 }
 
 impl SemanticErrorType {
@@ -242,6 +244,11 @@ impl SemanticErrorType {
                 "",
             ),
             Self::IllegalReturn => "Tried to return a value outside of a function body".to_string(),
+            Self::IllegalMethodName(name) => Self::one_var_message(
+                "Cannot declare method",
+                name,
+                "because it has a non-allowed name, e.g. 'new'",
+            ),
         }
     }
 
@@ -283,6 +290,7 @@ impl SemanticErrorType {
             Self::IllegalClassDeclaration(_) => "IllegalClassDeclaration",
             Self::ReturnTypeMismatch { .. } => "ReturnTypeMismatch",
             Self::IllegalReturn => "IllegalReturn",
+            Self::IllegalMethodName(_) => "IllegalMethodName",
         }
     }
 }

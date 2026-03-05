@@ -355,7 +355,7 @@ impl SemanticAnalyzer {
         &self,
         methods: &mut HashMap<String, Vec<Function>>,
         fields: &HashMap<String, Field>,
-        method_info: MethodDeclarationInfo,
+        mut method_info: MethodDeclarationInfo,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
         if fields.contains_key(&method_info.name) {
@@ -370,7 +370,20 @@ impl SemanticAnalyzer {
             unreachable!("Nested methods are illegal and should have been caught by the parser");
         }
 
-        let return_type: Type = Type::from(&method_info.return_type);
+        if method_info.name == "new" {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::IllegalMethodName(method_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
+        let return_type: Type = if method_info.return_type.is_empty() {
+            method_info.name = "new".into();
+            Type::from(&method_info.class_name)
+        } else {
+            Type::from(&method_info.return_type)
+        };
 
         let mut method_analyzer: Self = Self {
             scope: Scope::new(Some(Box::new(self.scope.clone()))),
