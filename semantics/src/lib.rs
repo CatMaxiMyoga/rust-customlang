@@ -567,6 +567,7 @@ impl SemanticAnalyzer {
                 right,
             } => self.binary(*left, &operator, *right),
             Expression::Unary { operator, operand } => self.unary(&operator, *operand),
+            Expression::Call { callee, arguments } => self.call(*callee, arguments),
             _ => todo!(),
         }
     }
@@ -636,5 +637,25 @@ impl SemanticAnalyzer {
             .get_method(&func_name, &[], loc)?
             .return_type
             .clone())
+    }
+
+    fn call(&self, callee: Expr, arguments: Vec<Expr>) -> ExpressionReturn {
+        let arguments: Vec<Type> = arguments
+            .into_iter()
+            .map(|arg| self.expression(arg))
+            .collect::<Result<_, _>>()?;
+
+        let loc: (usize, usize) = Self::get_loc(&callee.span);
+
+        Ok(match callee.node {
+            Expression::Identifier(name) => self.scope.get_function(&name, loc),
+            Expression::MemberAccess { object, member } => {
+                let object_type: Type = self.expression(object.as_ref().clone())?;
+                let class: Class = self.scope.get_class(&String::from(&object_type), loc)?;
+                class.get_method(&member, &arguments, loc).cloned()
+            }
+            _ => unreachable!("Parser only allows identifiers and member accesses as callees."),
+        }?
+        .return_type)
     }
 }
