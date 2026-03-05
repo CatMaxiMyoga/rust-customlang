@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use parser::types::{BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt};
+use parser::types::{
+    BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt, UnaryOperator,
+};
 
 use crate::{
     errors::{SemanticError, SemanticErrorType},
@@ -564,6 +566,7 @@ impl SemanticAnalyzer {
                 operator,
                 right,
             } => self.binary(*left, &operator, *right),
+            Expression::Unary { operator, operand } => self.unary(&operator, *operand),
             _ => todo!(),
         }
     }
@@ -613,5 +616,25 @@ impl SemanticAnalyzer {
                 .return_type
                 .clone())
         }
+    }
+
+    fn unary(&self, operator: &UnaryOperator, operand: Expr) -> ExpressionReturn {
+        let loc: (usize, usize) = Self::get_loc(&operand.span);
+
+        let op_type: Type = self.expression(operand)?;
+
+        let func_name: String = format!(
+            "_uop{}",
+            match operator {
+                UnaryOperator::Not => "Not",
+            }
+        );
+
+        let op_class: Class = self.scope.get_class(&String::from(&op_type), loc)?;
+
+        Ok(op_class
+            .get_method(&func_name, &[], loc)?
+            .return_type
+            .clone())
     }
 }
