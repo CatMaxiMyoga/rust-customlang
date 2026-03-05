@@ -1,6 +1,6 @@
 //! The semantic analysis crate for the custom language's AST.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use parser::types::{
     BinaryOperator, Expr, Expression, Literal, Span, Statement, Stmt, UnaryOperator,
@@ -434,25 +434,23 @@ impl SemanticAnalyzer {
             is_static: false,
         };
 
-        // FIXME: fix this warning later
-        #[allow(clippy::map_entry)]
-        if methods.contains_key(&method_info.name) {
-            for m in &methods[&method_info.name] {
-                if m.parameters == method.parameters {
-                    return Err(SemanticError {
-                        error_type: SemanticErrorType::DuplicateMethod(method_info.name),
-                        line: loc.0,
-                        column: loc.1,
-                    });
+        match methods.entry(method_info.name.clone()) {
+            Entry::Occupied(mut entry) => {
+                for m in entry.get() {
+                    if m.parameters == method.parameters {
+                        return Err(SemanticError {
+                            error_type: SemanticErrorType::DuplicateMethod(method_info.name),
+                            line: loc.0,
+                            column: loc.1,
+                        });
+                    }
                 }
-            }
 
-            methods
-                .get_mut(&method_info.name)
-                .expect("Checked before")
-                .push(method);
-        } else {
-            methods.insert(method_info.name, vec![method]);
+                entry.get_mut().push(method);
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(vec![method]);
+            }
         }
 
         Ok(())
