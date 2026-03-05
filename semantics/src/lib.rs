@@ -568,6 +568,9 @@ impl SemanticAnalyzer {
             } => self.binary(*left, &operator, *right),
             Expression::Unary { operator, operand } => self.unary(&operator, *operand),
             Expression::Call { callee, arguments } => self.call(*callee, arguments),
+            Expression::MemberAccess { object, member } => {
+                self.member_access(*object, &member, loc)
+            }
             _ => todo!(),
         }
     }
@@ -657,5 +660,24 @@ impl SemanticAnalyzer {
             _ => unreachable!("Parser only allows identifiers and member accesses as callees."),
         }?
         .return_type)
+    }
+
+    fn member_access(&self, object: Expr, member: &str, loc: (usize, usize)) -> ExpressionReturn {
+        let object_type: Type = self.expression(object)?;
+        let class: Class = self.scope.get_class(&String::from(&object_type), loc)?;
+
+        // Cannot be method, since method calls are handled in `call` method
+        if class.fields.contains_key(member) {
+            Ok(class.fields[member].field_type.clone())
+        } else {
+            Err(SemanticError {
+                error_type: SemanticErrorType::FieldNotFound {
+                    class: class.name,
+                    field: member.to_string(),
+                },
+                line: loc.0,
+                column: loc.1,
+            })
+        }
     }
 }
