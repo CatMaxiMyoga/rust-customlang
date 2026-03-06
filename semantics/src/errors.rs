@@ -119,6 +119,8 @@ pub enum SemanticErrorType {
     IllegalReturn,
     /// User tried to declare a method with a non-allowed name, e.g. `new`.
     IllegalMethodName(String),
+    /// Initialization of semantic analyzer threw an error
+    InitializationError(String),
 }
 
 impl SemanticErrorType {
@@ -249,6 +251,11 @@ impl SemanticErrorType {
                 name,
                 "because it has a non-allowed name, e.g. 'new'",
             ),
+            Self::InitializationError(msg) => Self::one_var_message(
+                "Initialization of semantic analyzer failed with error",
+                msg,
+                "",
+            ),
         }
     }
 
@@ -291,6 +298,7 @@ impl SemanticErrorType {
             Self::ReturnTypeMismatch { .. } => "ReturnTypeMismatch",
             Self::IllegalReturn => "IllegalReturn",
             Self::IllegalMethodName(_) => "IllegalMethodName",
+            Self::InitializationError(_) => "InitializationError",
         }
     }
 }

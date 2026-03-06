@@ -13,6 +13,7 @@ dependencies = [
  "compiler",
  "lexer",
  "parser",
+ "semantics",
  "transpiler",
 ]
 

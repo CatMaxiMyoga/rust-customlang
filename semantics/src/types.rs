@@ -188,11 +188,12 @@ impl From<&String> for Type {
 /// Represents a scope containing all variables and functions defined in it as well as the parent
 /// scope (if any)
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Scope {
-    parent: Option<Box<Scope>>,
-    variables: HashMap<String, Variable>,
-    functions: HashMap<String, Function>,
-    classes: HashMap<String, Class>,
+    pub parent: Option<Box<Scope>>,
+    pub variables: HashMap<String, Variable>,
+    pub functions: HashMap<String, Function>,
+    pub classes: HashMap<String, Class>,
 }
 
 impl Scope {

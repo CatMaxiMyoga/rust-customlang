@@ -66,16 +66,18 @@ class X {
 
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
-    x = a;
+    /* self.x = a; FIXME: Can't access class type inside class' definition */
+    println("Constructor!");
   }
 
   /* Method - called via .<methodname>(<args>) */
   void printX() {
-    println("X(" + intToString(self.x) + ")");
+    int y = 10;
+    println("X(" + y.toString() + ")");
   }
 }
 
 X y = X.new(10);
 y.printX();
-printInt(y.x);
+/* printInt(y.x); FIXME: l.69 */
 println("");

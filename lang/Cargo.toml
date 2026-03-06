@@ -7,6 +7,7 @@ edition = "2024"
 compiler = { path = "../compiler" }
 lexer = { path = "../lexer" }
 parser = { path = "../parser" }
+semantics = { path = "../semantics" }
 transpiler = { path = "../transpiler" }
 
 [lints]

@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-pub mod builtin_types;
+pub mod builtins;
 pub mod errors;
 pub mod types;
 
@@ -39,6 +39,14 @@ impl SemanticAnalyzer {
             function_return: None,
             class: None,
         };
+
+        for class in builtins::get_builtin_types() {
+            analyzer.scope.add_class(class, (0, 0))?;
+        }
+
+        for (name, func) in builtins::get_builtin_functions() {
+            analyzer.scope.add_function(name, func[0].clone(), (0, 0))?;
+        }
 
         for statement in ast.statements {
             analyzer.statement(statement, true)?;
@@ -657,7 +665,16 @@ impl SemanticAnalyzer {
         Ok(match callee.node {
             Expression::Identifier(name) => self.scope.get_function(&name, loc),
             Expression::MemberAccess { object, member } => {
-                let object_type: Type = self.expression(object.as_ref().clone())?;
+                let object_type: Type = match &object.node {
+                    Expression::Identifier(ident) => {
+                        if self.scope.get_class(ident, loc).is_ok() {
+                            Type::Class(ident.clone())
+                        } else {
+                            self.expression(*object)?
+                        }
+                    }
+                    _ => self.expression(object.as_ref().clone())?,
+                };
                 let class: Class = self.scope.get_class(&String::from(&object_type), loc)?;
                 class.get_method(&member, &arguments, loc).cloned()
             }
@@ -667,7 +684,16 @@ impl SemanticAnalyzer {
     }
 
     fn member_access(&self, object: Expr, member: &str, loc: (usize, usize)) -> ExpressionReturn {
-        let object_type: Type = self.expression(object)?;
+        let object_type: Type = match &object.node {
+            Expression::Identifier(ident) => {
+                if self.scope.get_class(ident, loc).is_ok() {
+                    Type::Class(ident.clone())
+                } else {
+                    self.expression(object)?
+                }
+            }
+            _ => self.expression(object)?,
+        };
         let class: Class = self.scope.get_class(&String::from(&object_type), loc)?;
 
         // Cannot be method, since method calls are handled in `call` method

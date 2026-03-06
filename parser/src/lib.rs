@@ -16,6 +16,7 @@ pub struct Parser {
     index: usize,
     outside_global_scope: bool,
     inside_class: Option<String>,
+    inside_method: bool,
     inside_static: bool,
 }
 
@@ -39,6 +40,7 @@ impl Parser {
             index: 0,
             outside_global_scope: false,
             inside_class: None,
+            inside_method: false,
             inside_static: false,
         };
 
@@ -568,7 +570,7 @@ impl Parser {
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
-        if self.inside_class.is_some() {
+        if self.inside_class.is_some() && !self.inside_method {
             return self.parse_field_declaration();
         }
         let token: Token = self.peek()?.clone();
@@ -680,14 +682,20 @@ impl Parser {
         self.expect_token(&TokenKind::RightParen)?;
 
         self.expect_token(&TokenKind::LeftBrace)?;
+
         let outside_global_scope_backup: bool = self.outside_global_scope;
         self.outside_global_scope = true;
+        self.inside_method = self.inside_class.is_some();
+
         let mut body: Vec<Stmt> = Vec::new();
         while !self.match_token(&TokenKind::RightBrace) {
             body.push(self.parse_statement()?);
         }
+
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
+
         self.outside_global_scope = outside_global_scope_backup;
+        self.inside_method = false;
 
         if self.inside_class.is_some() {
             Ok(Spanned {
