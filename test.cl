@@ -62,11 +62,12 @@ println("");
 
 class X {
   /* Field - accessed via .<fieldname> */
-  int x;
+  /* int x; FIXME: l.69: Can't access field x since it can't be initialized */
+  static int d = 20;
 
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
-    /* self.x = a; FIXME: Can't access class type inside class' definition */
+    /* self.x = a; FIXME: Can't access class type inside class' definition (semantic analysis) */
     println("Constructor!");
   }
 
@@ -75,9 +76,45 @@ class X {
     int y = 10;
     println("X(" + y.toString() + ")");
   }
+
+  static int staticMethod() {
+    return 4;
+  }
 }
 
 X y = X.new(10);
 y.printX();
-/* printInt(y.x); FIXME: l.69 */
-println("");
+
+/* printInt(y.x); FIXME: l.69: Can't access field x since it can't be initialized */
+
+/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
+ * println(X.d);
+ */
+
+println(X.staticMethod().toString());
+
+/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
+ * println(1);
+ */
+
+void strfunc(string s) {
+  println(s);
+}
+
+/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
+ * strfunc(2);
+ */
+
+/* NOTE: Missing variable error works correctly
+ * println(k);
+ */
+
+/* NOTE: Missing function error works correctly
+ * hehe();
+ */
+
+/* FIXME: Allows making variables of type void
+ * void x = X.printX();
+ */
+
+/* TODO: Lots of missing errors... */
