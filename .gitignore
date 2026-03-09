@@ -1,3 +1,7 @@
 /target
 **/cs_runtime/bin
 **/cs_runtime/obj
+
+# Files generated during testing
+output
+output.cs
