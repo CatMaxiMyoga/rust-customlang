@@ -120,7 +120,11 @@ pub enum SemanticErrorType {
     /// User tried to declare a method with a non-allowed name, e.g. `new`.
     IllegalMethodName(String),
     /// Initialization of semantic analyzer threw an error
-    InitializationError(String),
+    InternalInitializationError(String),
+    /// User declared a class field after declaring a method.
+    FieldAfterMethod(String),
+    /// User didn't return a value in a non-void function or method.
+    MissingReturn,
 }
 
 impl SemanticErrorType {
@@ -251,11 +255,17 @@ impl SemanticErrorType {
                 name,
                 "because it has a non-allowed name, e.g. 'new'",
             ),
-            Self::InitializationError(msg) => Self::one_var_message(
+            Self::InternalInitializationError(msg) => Self::one_var_message(
                 "Initialization of semantic analyzer failed with error",
                 msg,
                 "",
             ),
+            Self::FieldAfterMethod(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because fields must be declared before methods in a class",
+            ),
+            Self::MissingReturn=>"Non-void function or method is missing a return statement".to_string(),
         }
     }
 
@@ -298,7 +308,9 @@ impl SemanticErrorType {
             Self::ReturnTypeMismatch { .. } => "ReturnTypeMismatch",
             Self::IllegalReturn => "IllegalReturn",
             Self::IllegalMethodName(_) => "IllegalMethodName",
-            Self::InitializationError(_) => "InitializationError",
+            Self::InternalInitializationError(_) => "Internal: InitializationError",
+            Self::FieldAfterMethod(_) => "FieldAfterMethod",
+            Self::MissingReturn => "MissingReturn",
         }
     }
 }

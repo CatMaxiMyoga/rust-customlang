@@ -62,19 +62,18 @@ println("");
 
 class X {
   /* Field - accessed via .<fieldname> */
-  /* int x; FIXME: l.69: Can't access field x since it can't be initialized */
+  int x;
   static int d = 20;
 
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
-    /* self.x = a; FIXME: Can't access class type inside class' definition (semantic analysis) */
+    self.x = a;
     println("Constructor!");
   }
 
   /* Method - called via .<methodname>(<args>) */
   void printX() {
-    int y = 10;
-    println("X(" + y.toString() + ")");
+    println("X(" + self.x.toString() + ")");
   }
 
   static int staticMethod() {
@@ -85,7 +84,7 @@ class X {
 X y = X.new(10);
 y.printX();
 
-/* printInt(y.x); FIXME: l.69: Can't access field x since it can't be initialized */
+printInt(y.x);
 
 /* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
  * println(X.d);
@@ -117,4 +116,12 @@ void strfunc(string s) {
  * void x = X.printX();
  */
 
-/* TODO: Lots of missing errors... */
+/* FIXME: Not all code paths have to return a value in a non-void function or method
+ * string s(bool b) {
+ *   if (b) {
+ *     return "true";
+ *   }
+ * }
+ */
+
+/* TODO: Lots of missing errors... Fix these, find more later... */

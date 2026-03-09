@@ -12,9 +12,9 @@ pub type StatementReturn = Result<(), SemanticError>;
 /// Represents the result of analyzing an expression, which has a type which will be returned.
 pub type ExpressionReturn = Result<Type, SemanticError>;
 
-/// Holds information for the `method_declaration` method to avoid `too_many_arguments` lint.
-pub struct MethodDeclarationInfo {
-    /// The class this method belongs to
+/// Holds information for the `method_signature` method to avoid `too_many_arguments` lint.
+pub struct MethodDeclarationSignatureInfo {
+    /// The class this method belongs to.
     pub class_name: String,
     /// The return type of the method.
     pub return_type: String,
@@ -22,10 +22,22 @@ pub struct MethodDeclarationInfo {
     pub name: String,
     /// The parameters of the method `(Type, Identifier)`.
     pub parameters: Vec<(String, String)>,
-    /// The body of the method.
-    pub body: Vec<Stmt>,
     /// Whether or not the method is static.
     pub static_: bool,
+}
+
+/// Holds information for the `method_body` method.
+pub struct MethodDeclarationBodyInfo {
+    /// The return type of the method.
+    pub return_type: Type,
+    /// The parameters of the method.
+    pub parameters: Vec<(Type, String)>,
+    /// The body of the method.
+    pub body: Vec<Stmt>,
+    /// Whether or not the method is a constructor.
+    pub constructor: bool,
+    /// The starting location of the method.
+    pub loc: (usize, usize),
 }
 
 /// Holds information for the `field_declaration` method to avoid `too_many_arguments` lint.
@@ -253,15 +265,22 @@ impl Scope {
     ///   any parent scope.
     /// - `SemanticErrorType::VariableUninitialized`: If the variable is found but hasn't been
     ///   initialized yet.
+    ///
+    /// # Panics
+    /// Panics if the variable is first found but then... not
     pub fn assign_variable(
         &mut self,
         name: &str,
         value_type: &Type,
         loc: (usize, usize),
     ) -> Result<(), SemanticError> {
-        let var_type: Type = self.get_variable(name, loc)?;
+        let var_type: Type = self.get_local_variable(name, loc)?;
 
         if var_type == *value_type {
+            self.variables
+                .get_mut(name)
+                .expect("Checked before")
+                .initialized = true;
             Ok(())
         } else {
             Err(SemanticError {
@@ -302,9 +321,9 @@ impl Scope {
                 },
                 |var| {
                     if var.initialized {
-                        Err(SemanticErrorType::VariableUninitialized(name.to_string()))
-                    } else {
                         Ok(var.var_type.clone())
+                    } else {
+                        Err(SemanticErrorType::VariableUninitialized(name.to_string()))
                     }
                 },
             )

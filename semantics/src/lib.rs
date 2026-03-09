@@ -10,7 +10,7 @@ use crate::{
     errors::{SemanticError, SemanticErrorType},
     types::{
         Class, ExpressionReturn, Field, FieldDeclarationInfo, Function, LValue,
-        MethodDeclarationInfo, Scope, StatementReturn, Type,
+        MethodDeclarationBodyInfo, MethodDeclarationSignatureInfo, Scope, StatementReturn, Type,
     },
 };
 
@@ -21,6 +21,7 @@ pub mod types;
 /// Analyzes the AST for semantic correctness, such as type checking and scope resolution (later on)
 pub struct SemanticAnalyzer {
     function_return: Option<Type>,
+    found_return: bool,
     class: Option<Type>,
     scope: Scope,
 }
@@ -37,6 +38,7 @@ impl SemanticAnalyzer {
         let mut analyzer: Self = Self {
             scope: Scope::new(None),
             function_return: None,
+            found_return: false,
             class: None,
         };
 
@@ -160,7 +162,7 @@ impl SemanticAnalyzer {
                         class: expr_type,
                         field_name: member,
                     })
-                } else if matches!(object.node, Expression::Identifier(_)) {
+                } else if matches!(object.node, Expression::Identifier(_) | Expression::Self_) {
                     Ok(LValue::Field {
                         base: expr_type,
                         field_name: member,
@@ -207,6 +209,7 @@ impl SemanticAnalyzer {
         let mut function_analyzer: Self = Self {
             scope: Scope::new(Some(Box::new(self.scope.clone()))),
             function_return: Some(return_type.clone()),
+            found_return: false,
             class: None,
         };
 
@@ -223,19 +226,27 @@ impl SemanticAnalyzer {
             param_types.push(param_type);
         }
 
-        for statement in body {
-            function_analyzer.statement(statement, false)?;
-        }
-
         self.scope.add_function(
             name.to_string(),
             Function {
                 parameters: param_types,
-                return_type,
+                return_type: return_type.clone(),
                 is_static: false,
             },
             loc,
         )?;
+
+        for statement in body {
+            function_analyzer.statement(statement, false)?;
+        }
+
+        if return_type != Type::Void && !function_analyzer.found_return {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::MissingReturn,
+                line: loc.0,
+                column: loc.1,
+            });
+        }
 
         Ok(())
     }
@@ -257,6 +268,11 @@ impl SemanticAnalyzer {
 
         let mut fields: HashMap<String, Field> = HashMap::new();
         let mut methods: HashMap<String, Vec<Function>> = HashMap::new();
+        let mut body_info: Vec<MethodDeclarationBodyInfo> = Vec::new();
+
+        let mut found_method: bool = false;
+
+        let class_name: String = name.to_string();
 
         self.class = Some(Type::Class(name.to_string()));
         for statement in body {
@@ -268,42 +284,61 @@ impl SemanticAnalyzer {
                     name,
                     static_,
                     value,
-                } => self.field_declaration(
-                    &mut fields,
-                    &methods,
-                    FieldDeclarationInfo {
-                        field_type: type_,
-                        name,
-                        static_,
-                        value,
-                    },
-                    loc,
-                )?,
+                } => {
+                    if found_method {
+                        return Err(SemanticError {
+                            error_type: SemanticErrorType::FieldAfterMethod(name),
+                            line: loc.0,
+                            column: loc.1,
+                        });
+                    }
+
+                    self.field_declaration(
+                        &mut fields,
+                        &methods,
+                        FieldDeclarationInfo {
+                            field_type: type_,
+                            name,
+                            static_,
+                            value,
+                        },
+                        loc,
+                    )?;
+                }
                 Statement::MethodDeclaration {
                     return_type,
                     name,
                     parameters,
                     body,
                     static_,
-                } => self.method_declaration(
-                    &mut methods,
-                    &fields,
-                    MethodDeclarationInfo {
-                        class_name: name.to_string(),
-                        return_type,
-                        name,
-                        parameters,
+                } => {
+                    found_method = true;
+                    let (params, ret, constructor): (Vec<(Type, String)>, Type, bool) = self
+                        .method_signature(
+                            &mut methods,
+                            &fields,
+                            MethodDeclarationSignatureInfo {
+                                class_name: class_name.clone(),
+                                return_type: return_type.clone(),
+                                name: name.clone(),
+                                parameters,
+                                static_,
+                            },
+                            loc,
+                        )?;
+                    body_info.push(MethodDeclarationBodyInfo {
+                        return_type: ret,
+                        parameters: params,
+                        constructor,
                         body,
-                        static_,
-                    },
-                    loc,
-                )?,
+                        loc,
+                    });
+                }
                 _ => unreachable!(
                     "The parser should only allow field and method declarations in calsses."
                 ),
             }
         }
-        self.class = None;
 
         self.scope.add_class(
             Class {
@@ -313,6 +348,11 @@ impl SemanticAnalyzer {
             },
             loc,
         )?;
+
+        for info in body_info {
+            self.method_body(info)?;
+        }
+        self.class = None;
 
         Ok(())
     }
@@ -366,13 +406,13 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    fn method_declaration(
+    fn method_signature(
         &self,
         methods: &mut HashMap<String, Vec<Function>>,
         fields: &HashMap<String, Field>,
-        mut method_info: MethodDeclarationInfo,
+        mut method_info: MethodDeclarationSignatureInfo,
         loc: (usize, usize),
-    ) -> Result<(), SemanticError> {
+    ) -> Result<(Vec<(Type, String)>, Type, bool), SemanticError> {
         if fields.contains_key(&method_info.name) {
             return Err(SemanticError {
                 error_type: SemanticErrorType::MethodFieldNameConflict(method_info.name),
@@ -393,52 +433,39 @@ impl SemanticAnalyzer {
             });
         }
 
+        let mut constructor: bool = false;
+
         let return_type: Type = if method_info.return_type.is_empty() {
             method_info.name = "new".into();
+            constructor = true;
             Type::from(&method_info.class_name)
         } else {
             Type::from(&method_info.return_type)
         };
 
-        let mut method_analyzer: Self = Self {
-            scope: Scope::new(Some(Box::new(self.scope.clone()))),
-            function_return: Some(return_type.clone()),
-            class: self.class.clone(),
-        };
-
-        if !method_info.static_ {
-            method_analyzer.scope.add_variable(
-                "self".to_string(),
-                Type::Class(method_info.class_name.clone()),
-                loc,
-            )?;
-            method_analyzer.scope.assign_variable(
-                "self",
-                &Type::Class(method_info.class_name.clone()),
-                loc,
-            )?;
-        }
-
+        let mut params: Vec<(Type, String)> = Vec::new();
         let mut param_types: Vec<Type> = Vec::new();
 
-        for (param_type, param_name) in method_info.parameters {
-            let param_type: Type = Type::from(&param_type);
-            method_analyzer
-                .scope
-                .add_variable(param_name.clone(), param_type.clone(), loc)?;
-            method_analyzer
-                .scope
-                .assign_variable(&param_name, &param_type, loc)?;
-            param_types.push(param_type);
+        if !method_info.static_ {
+            params.push((
+                Type::Class(method_info.class_name.clone()),
+                "self".to_string(),
+            ));
         }
 
-        for statement in method_info.body {
-            method_analyzer.statement(statement, false)?;
+        for (param_type, param_name) in method_info.parameters {
+            let param_type: Type = if param_type == "Self" {
+                Type::Class(method_info.class_name.clone())
+            } else {
+                Type::from(&param_type)
+            };
+            param_types.push(param_type.clone());
+            params.push((param_type, param_name));
         }
 
         let method: Function = Function {
             parameters: param_types,
-            return_type,
+            return_type: return_type.clone(),
             is_static: false,
         };
 
@@ -459,6 +486,43 @@ impl SemanticAnalyzer {
             Entry::Vacant(entry) => {
                 entry.insert(vec![method]);
             }
+        }
+
+        Ok((params, return_type, constructor))
+    }
+
+    fn method_body(&self, mut method_info: MethodDeclarationBodyInfo) -> StatementReturn {
+        let mut method_analyzer: Self = Self {
+            scope: Scope::new(Some(Box::new(self.scope.clone()))),
+            function_return: Some(if method_info.constructor {
+                method_info.return_type = Type::Void;
+                Type::Void
+            } else {
+                method_info.return_type.clone()
+            }),
+            found_return: false,
+            class: self.class.clone(),
+        };
+
+        for (ptype, pname) in method_info.parameters {
+            method_analyzer
+                .scope
+                .add_variable(pname.clone(), ptype.clone(), method_info.loc)?;
+            method_analyzer
+                .scope
+                .assign_variable(&pname, &ptype, method_info.loc)?;
+        }
+
+        for statement in method_info.body {
+            method_analyzer.statement(statement, false)?;
+        }
+
+        if method_info.return_type != Type::Void && !method_analyzer.found_return {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::MissingReturn,
+                line: method_info.loc.0,
+                column: method_info.loc.1,
+            });
         }
 
         Ok(())
@@ -518,7 +582,7 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    fn return_statement(&self, expr: Option<Expr>, loc: (usize, usize)) -> StatementReturn {
+    fn return_statement(&mut self, expr: Option<Expr>, loc: (usize, usize)) -> StatementReturn {
         let function_return: Type = match &self.function_return {
             Some(ret) => ret.clone(),
             None => {
@@ -547,6 +611,7 @@ impl SemanticAnalyzer {
             let expr_type: Type = self.expression(expr)?;
 
             if expr_type == function_return {
+                self.found_return = true;
                 Ok(())
             } else {
                 Err(SemanticError {
@@ -559,6 +624,7 @@ impl SemanticAnalyzer {
                 })
             }
         } else {
+            self.found_return = true;
             Ok(())
         }
     }
