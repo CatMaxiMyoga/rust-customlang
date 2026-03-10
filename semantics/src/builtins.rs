@@ -4,12 +4,23 @@ use std::collections::HashMap;
 
 use crate::types::{Class, Function, Type};
 
+/// # Example
+/// ```
+/// functions![
+///     /* non-static function */
+///     somefunc(String, Int) => String,
+///     /* static function, how it's supposed to be used for readability */
+///     somefunc(Int, String) => String #static,
+///     /* In reality, anything except another # can follow the #, so these are valid too */
+///     somefunc(Int, Int) => String #123,
+///     somefunc(String, String) => String #,,
+///     somefunc(Boolean) => String #/,
+/// ]
+/// ```
 macro_rules! functions {
-    ($({
-        $name:ident($($parameter_type:expr),*) => $return_type:expr,
-        $is_static:literal
-        $(,)?
-    }),+ $(,)?) => {
+    ($(
+        $name:ident($($parameter_type:ident),*) => $return_type:ident $(# $is_static:tt)? $(,)?
+    ),+) => {
         {
         let mut map: HashMap<String, Vec<Function>> = HashMap::new();
 
@@ -17,37 +28,37 @@ macro_rules! functions {
             .entry(stringify!($name).into())
             .or_default()
             .push(Function {
-                parameters: vec![$($parameter_type),*],
-                return_type: $return_type,
-                is_static: $is_static,
+                parameters: vec![$(Type::$parameter_type),*],
+                return_type: Type::$return_type,
+                is_static: functions!(@s $($is_static)?),
             });
         )+
 
         map
         }
     };
-    (@params [$($parameter_type:expr),+]) => { vec![$($parameter_type),+] };
-    (@params) => { vec![] };
+    (@s $is_static:tt) => { true };
+    (@s) => { false };
 }
 
 /// Returns a hashmap of the builtin functions for the global scope <Name, Functions>.
 #[must_use]
 pub fn get_builtin_functions() -> HashMap<String, Vec<Function>> {
     functions![
-        { print(Type::String) => Type::Void, false },
-        { println(Type::String) => Type::Void, false },
-        { boolToString(Type::Boolean) => Type::String, true },
-        { intToString(Type::Int) => Type::String, true },
-        { floatToString(Type::Float) => Type::String, true },
-        { stringToBool(Type::String) => Type::Boolean, true },
-        { intToBool(Type::Int) => Type::Boolean, true },
-        { floatToBool(Type::Float) => Type::Boolean, true },
-        { stringToInt(Type::String) => Type::Int, true },
-        { boolToInt(Type::Boolean) => Type::Int, true },
-        { floatToInt(Type::Float) => Type::Int, true },
-        { stringToFloat(Type::String) => Type::Float, true },
-        { boolToFloat(Type::Boolean) => Type::Float, true },
-        { intToFloat(Type::Int) => Type::Float, true },
+        print(String) => Void,
+        println(String) => Void,
+        boolToString(Boolean) => String,
+        intToString(Int) => String,
+        floatToString(Float) => String,
+        stringToBool(String) => Boolean,
+        intToBool(Int) => Boolean,
+        floatToBool(Float) => Boolean,
+        stringToInt(String) => Int,
+        boolToInt(Boolean) => Int,
+        floatToInt(Float) => Int,
+        stringToFloat(String) => Float,
+        boolToFloat(Boolean) => Float,
+        intToFloat(Int) => Float,
     ]
 }
 
@@ -68,13 +79,13 @@ fn builtin_string() -> Class {
     Class {
         name: "string".into(),
         methods: functions![
-            {toBool() => Type::Boolean, false},
-            {toInt() => Type::Int, false},
-            {toFloat() => Type::Float, false},
+            toBool() => Boolean,
+            toInt() => Int,
+            toFloat() => Float,
 
-            {_bopAdd(Type::String) => Type::String, false},
-            {_bopEq(Type::String) => Type::Boolean, false},
-            {_bopNe(Type::String) => Type::Boolean, false}
+            _bopAdd(String) => String,
+            _bopEq(String) => Boolean,
+            _bopNe(String) => Boolean,
         ],
         fields: HashMap::new(),
     }
@@ -84,16 +95,16 @@ fn builtin_bool() -> Class {
     Class {
         name: "bool".into(),
         methods: functions![
-            {toString() => Type::String, false},
-            {toInt() => Type::Int, false},
-            {toFloat() => Type::Float, false},
+            toString() => String,
+            toInt() => Int,
+            toFloat() => Float,
 
-            {_bopEq(Type::Boolean) => Type::Boolean, false},
-            {_bopNe(Type::Boolean) => Type::Boolean, false},
-            {_bopAnd(Type::Boolean) => Type::Boolean, false},
-            {_bopOr(Type::Boolean) => Type::Boolean, false},
+            _bopEq(Boolean) => Boolean,
+            _bopNe(Boolean) => Boolean,
+            _bopAnd(Boolean) => Boolean,
+            _bopOr(Boolean) => Boolean,
 
-            {_uopNot() => Type::Boolean, false}
+            _uopNot() => Boolean,
         ],
         fields: HashMap::new(),
     }
@@ -103,31 +114,31 @@ fn builtin_int() -> Class {
     Class {
         name: "int".into(),
         methods: functions![
-            {toString() => Type::String, false},
-            {toBool() => Type::Boolean, false},
-            {toFloat() => Type::Float, false},
+            toString() => String,
+            toBool() => Boolean,
+            toFloat() => Float,
 
-            {_bopAdd(Type::Int) => Type::Int, false},
-            {_bopSub(Type::Int) => Type::Int, false},
-            {_bopMul(Type::Int) => Type::Int, false},
-            {_bopDiv(Type::Int) => Type::Int, false},
-            {_bopEq(Type::Int) => Type::Boolean, false},
-            {_bopNe(Type::Int) => Type::Boolean, false},
-            {_bopLt(Type::Int) => Type::Boolean, false},
-            {_bopGt(Type::Int) => Type::Boolean, false},
-            {_bopLe(Type::Int) => Type::Boolean, false},
-            {_bopGe(Type::Int) => Type::Boolean, false},
+            _bopAdd(Int) => Int,
+            _bopSub(Int) => Int,
+            _bopMul(Int) => Int,
+            _bopDiv(Int) => Int,
+            _bopEq(Int) => Boolean,
+            _bopNe(Int) => Boolean,
+            _bopLt(Int) => Boolean,
+            _bopGt(Int) => Boolean,
+            _bopLe(Int) => Boolean,
+            _bopGe(Int) => Boolean,
 
-            {_bopAdd(Type::Float) => Type::Float, false},
-            {_bopSub(Type::Float) => Type::Float, false},
-            {_bopMul(Type::Float) => Type::Float, false},
-            {_bopDiv(Type::Float) => Type::Float, false},
-            {_bopEq(Type::Float) => Type::Boolean, false},
-            {_bopNe(Type::Float) => Type::Boolean, false},
-            {_bopLt(Type::Float) => Type::Boolean, false},
-            {_bopGt(Type::Float) => Type::Boolean, false},
-            {_bopLe(Type::Float) => Type::Boolean, false},
-            {_bopGe(Type::Float) => Type::Boolean, false},
+            _bopAdd(Float) => Float,
+            _bopSub(Float) => Float,
+            _bopMul(Float) => Float,
+            _bopDiv(Float) => Float,
+            _bopEq(Float) => Boolean,
+            _bopNe(Float) => Boolean,
+            _bopLt(Float) => Boolean,
+            _bopGt(Float) => Boolean,
+            _bopLe(Float) => Boolean,
+            _bopGe(Float) => Boolean,
         ],
         fields: HashMap::new(),
     }
@@ -137,31 +148,31 @@ fn builtin_float() -> Class {
     Class {
         name: "float".into(),
         methods: functions![
-            {toString() => Type::String, false},
-            {toBool() => Type::Boolean, false},
-            {toInt() => Type::Int, false},
+            toString() => String,
+            toBool() => Boolean,
+            toInt() => Int,
 
-            {_bopAdd(Type::Float) => Type::Float, false},
-            {_bopSub(Type::Float) => Type::Float, false},
-            {_bopMul(Type::Float) => Type::Float, false},
-            {_bopDiv(Type::Float) => Type::Float, false},
-            {_bopEq(Type::Float) => Type::Boolean, false},
-            {_bopNe(Type::Float) => Type::Boolean, false},
-            {_bopLt(Type::Float) => Type::Boolean, false},
-            {_bopGt(Type::Float) => Type::Boolean, false},
-            {_bopLe(Type::Float) => Type::Boolean, false},
-            {_bopGe(Type::Float) => Type::Boolean, false},
+            _bopAdd(Float) => Float,
+            _bopSub(Float) => Float,
+            _bopMul(Float) => Float,
+            _bopDiv(Float) => Float,
+            _bopEq(Float) => Boolean,
+            _bopNe(Float) => Boolean,
+            _bopLt(Float) => Boolean,
+            _bopGt(Float) => Boolean,
+            _bopLe(Float) => Boolean,
+            _bopGe(Float) => Boolean,
 
-            {_bopAdd(Type::Int) => Type::Float, false},
-            {_bopSub(Type::Int) => Type::Float, false},
-            {_bopMul(Type::Int) => Type::Float, false},
-            {_bopDiv(Type::Int) => Type::Float, false},
-            {_bopEq(Type::Int) => Type::Boolean, false},
-            {_bopNe(Type::Int) => Type::Boolean, false},
-            {_bopLt(Type::Int) => Type::Boolean, false},
-            {_bopGt(Type::Int) => Type::Boolean, false},
-            {_bopLe(Type::Int) => Type::Boolean, false},
-            {_bopGe(Type::Int) => Type::Boolean, false},
+            _bopAdd(Int) => Float,
+            _bopSub(Int) => Float,
+            _bopMul(Int) => Float,
+            _bopDiv(Int) => Float,
+            _bopEq(Int) => Boolean,
+            _bopNe(Int) => Boolean,
+            _bopLt(Int) => Boolean,
+            _bopGt(Int) => Boolean,
+            _bopLe(Int) => Boolean,
+            _bopGe(Int) => Boolean,
         ],
         fields: HashMap::new(),
     }
