@@ -124,4 +124,13 @@ void strfunc(string s) {
  * }
  */
 
+/* FIXME: Not all code paths have to initialize a variable before it's used
+ * bool somebool = true;
+ * string somestring;
+ * if (somebool) {
+ *   somestring = "hello";
+ * }
+ * println(somestring);
+ */
+
 /* TODO: Lots of missing errors... Fix these, find more later... */
