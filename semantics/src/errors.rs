@@ -125,6 +125,24 @@ pub enum SemanticErrorType {
     FieldAfterMethod(String),
     /// User didn't return a value in a non-void function or method.
     MissingReturn,
+    /// User tried to call a function with the wrong argument types.
+    ArgumentTypeMismatch {
+        /// The name of the function that was being called.
+        func: String,
+        /// The expected types of the arguments based on the function's declaration.
+        expected: Vec<String>,
+        /// The actual types of the arguments that were passed in the function call.
+        found: Vec<String>,
+    },
+    /// User tried to call a method with arguments that no overload of the method accepts.
+    MethodOverloadNotFound {
+        /// The class the method belongs to.
+        class: String,
+        /// The name of the method that was being called.
+        method: String,
+        /// The given argument types that didn't match any overload of the method.
+        argument_types: Vec<String>,
+    },
 }
 
 impl SemanticErrorType {
@@ -265,19 +283,63 @@ impl SemanticErrorType {
                 field,
                 "because fields must be declared before methods in a class",
             ),
-            Self::MissingReturn=>"Non-void function or method is missing a return statement".to_string(),
+            Self::MissingReturn => {
+                "Non-void function or method is missing a return statement".to_string()
+            }
+            Self::ArgumentTypeMismatch {
+                func,
+                expected,
+                found,
+            } => Self::three_var_message(
+                "Tried to call function",
+                func,
+                "expecting parameters of type",
+                expected.join(", ").as_str(),
+                "with arguments of type",
+                found.join(", ").as_str(),
+                "",
+            ),
+            Self::MethodOverloadNotFound {
+                class,
+                method,
+                argument_types,
+            } => Self::three_var_message(
+                "Tried to call method",
+                method,
+                "of class",
+                class,
+                "with arguments of type",
+                argument_types.join(", ").as_str(),
+                "but no overload of the method accepts this.",
+            ),
         }
     }
 
-    fn one_var_message(part1: &str, var: &str, part2: &str) -> String {
-        format!("{part1} '{var}' {part2}")
+    fn one_var_message(p1: &str, v: &str, p2: &str) -> String {
+        format!("{p1} '{v}' {p2}")
     }
 
-    fn two_var_message(part1: &str, var1: &str, part2: &str, var2: &str, part3: &str) -> String {
-        if part3.is_empty() {
-            format!("{part1} '{var1}' {part2} '{var2}'")
+    fn two_var_message(p1: &str, v1: &str, p2: &str, v2: &str, p3: &str) -> String {
+        if p3.is_empty() {
+            format!("{p1} '{v1}' {p2} '{v2}'")
         } else {
-            format!("{part1} '{var1}' {part2} '{var2}' {part3}")
+            format!("{p1} '{v1}' {p2} '{v2}' {p3}")
+        }
+    }
+
+    fn three_var_message(
+        p1: &str,
+        v1: &str,
+        p2: &str,
+        v2: &str,
+        p3: &str,
+        v3: &str,
+        p4: &str,
+    ) -> String {
+        if p4.is_empty() {
+            format!("{p1} '{v1}' {p2} '{v2}' {p3} '{v3}'")
+        } else {
+            format!("{p1} '{v1}' {p2} '{v2}' {p3} '{v3}' {p4}")
         }
     }
 
@@ -311,6 +373,8 @@ impl SemanticErrorType {
             Self::InternalInitializationError(_) => "Internal: InitializationError",
             Self::FieldAfterMethod(_) => "FieldAfterMethod",
             Self::MissingReturn => "MissingReturn",
+            Self::ArgumentTypeMismatch { .. } => "ArgumentTypeMismatch",
+            Self::MethodOverloadNotFound { .. } => "MethodOverloadNotFound",
         }
     }
 }

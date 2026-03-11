@@ -26,6 +26,9 @@ pub struct MethodDeclarationSignatureInfo {
     pub static_: bool,
 }
 
+/// Holds information the `method_signature` method will return
+pub struct MethodDeclarationSignatureReturn(pub Vec<(Type, String)>, pub Type, pub bool);
+
 /// Holds information for the `method_body` method.
 pub struct MethodDeclarationBodyInfo {
     /// The return type of the method.
@@ -124,9 +127,10 @@ impl Class {
                     .find(|m: &&Function| m.parameters == parameter_types)
             })
             .ok_or_else(|| SemanticError {
-                error_type: SemanticErrorType::MethodNotFound {
+                error_type: SemanticErrorType::MethodOverloadNotFound {
                     class: self.name.clone(),
                     method: method_name.into(),
+                    argument_types: parameter_types.iter().map(Into::into).collect(),
                 },
                 line: loc.0,
                 column: loc.1,

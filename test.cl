@@ -67,8 +67,17 @@ class X {
 
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
+    /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
+     * Error on line 129 to be fixed. */
     self.x = a;
     println("Constructor!");
+  }
+  
+  static Self X(string s) {
+    /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
+     * Error on line 129 to be fixed. */
+    self.x = s.toInt();
+    println("Constructor with string!");
   }
 
   /* Method - called via .<methodname>(<args>) */
@@ -79,30 +88,24 @@ class X {
   static int staticMethod() {
     return 4;
   }
+
+  int _bopAdd(X other) {
+    return self.x + other.x;
+  }
 }
 
-X y = X.new(10);
+X y = X.new("10");
 y.printX();
 
 printInt(y.x);
 
-/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
+/* NOTE: Argument type mismatch error works correctly
  * println(X.d);
  */
 
 println(X.staticMethod().toString());
 
-/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
- * println(1);
- */
-
-void strfunc(string s) {
-  println(s);
-}
-
-/* FIXME: Doesn't throw semantic error even though it's an int where a string is expected
- * strfunc(2);
- */
+println(intToString(y + X.new(5)));
 
 /* NOTE: Missing variable error works correctly
  * println(k);

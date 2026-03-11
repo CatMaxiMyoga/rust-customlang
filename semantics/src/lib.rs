@@ -10,7 +10,8 @@ use crate::{
     errors::{SemanticError, SemanticErrorType},
     types::{
         Class, ExpressionReturn, Field, FieldDeclarationInfo, Function, LValue,
-        MethodDeclarationBodyInfo, MethodDeclarationSignatureInfo, Scope, StatementReturn, Type,
+        MethodDeclarationBodyInfo, MethodDeclarationSignatureInfo,
+        MethodDeclarationSignatureReturn, Scope, StatementReturn, Type,
     },
 };
 
@@ -313,23 +314,22 @@ impl SemanticAnalyzer {
                     static_,
                 } => {
                     found_method = true;
-                    let (params, ret, constructor): (Vec<(Type, String)>, Type, bool) = self
-                        .method_signature(
-                            &mut methods,
-                            &fields,
-                            MethodDeclarationSignatureInfo {
-                                class_name: class_name.clone(),
-                                return_type: return_type.clone(),
-                                name: name.clone(),
-                                parameters,
-                                static_,
-                            },
-                            loc,
-                        )?;
+                    let ret: MethodDeclarationSignatureReturn = self.method_signature(
+                        &mut methods,
+                        &fields,
+                        MethodDeclarationSignatureInfo {
+                            class_name: class_name.clone(),
+                            return_type: return_type.clone(),
+                            name: name.clone(),
+                            parameters,
+                            static_,
+                        },
+                        loc,
+                    )?;
                     body_info.push(MethodDeclarationBodyInfo {
-                        return_type: ret,
-                        parameters: params,
-                        constructor,
+                        parameters: ret.0,
+                        return_type: ret.1,
+                        constructor: ret.2,
                         body,
                         loc,
                     });
@@ -412,7 +412,7 @@ impl SemanticAnalyzer {
         fields: &HashMap<String, Field>,
         mut method_info: MethodDeclarationSignatureInfo,
         loc: (usize, usize),
-    ) -> Result<(Vec<(Type, String)>, Type, bool), SemanticError> {
+    ) -> Result<MethodDeclarationSignatureReturn, SemanticError> {
         if fields.contains_key(&method_info.name) {
             return Err(SemanticError {
                 error_type: SemanticErrorType::MethodFieldNameConflict(method_info.name),
@@ -488,7 +488,11 @@ impl SemanticAnalyzer {
             }
         }
 
-        Ok((params, return_type, constructor))
+        Ok(MethodDeclarationSignatureReturn(
+            params,
+            return_type,
+            constructor,
+        ))
     }
 
     fn method_body(&self, mut method_info: MethodDeclarationBodyInfo) -> StatementReturn {
@@ -729,7 +733,22 @@ impl SemanticAnalyzer {
         let loc: (usize, usize) = Self::get_loc(&callee.span);
 
         Ok(match callee.node {
-            Expression::Identifier(name) => self.scope.get_function(&name, loc),
+            Expression::Identifier(name) => {
+                let func: Function = self.scope.get_function(&name, loc)?;
+                if func.parameters == arguments {
+                    func.return_type
+                } else {
+                    return Err(SemanticError {
+                        error_type: SemanticErrorType::ArgumentTypeMismatch {
+                            func: name,
+                            expected: func.parameters.iter().map(Into::into).collect(),
+                            found: arguments.iter().map(Into::into).collect(),
+                        },
+                        line: loc.0,
+                        column: loc.1,
+                    });
+                }
+            }
             Expression::MemberAccess { object, member } => {
                 let object_type: Type = match &object.node {
                     Expression::Identifier(ident) => {
@@ -742,11 +761,13 @@ impl SemanticAnalyzer {
                     _ => self.expression(object.as_ref().clone())?,
                 };
                 let class: Class = self.scope.get_class(&String::from(&object_type), loc)?;
-                class.get_method(&member, &arguments, loc).cloned()
+                class
+                    .get_method(&member, &arguments, loc)?
+                    .clone()
+                    .return_type
             }
             _ => unreachable!("Parser only allows identifiers and member accesses as callees."),
-        }?
-        .return_type)
+        })
     }
 
     fn member_access(&self, object: Expr, member: &str, loc: (usize, usize)) -> ExpressionReturn {
