@@ -98,6 +98,8 @@ fn builtin_string() -> Class {
             toFloat() => Float,
 
             _bopAdd(String) => String,
+            _bopMul(Int) => String,
+            _bopDiv(String) => String,
             _bopEq(String) => Boolean,
             _bopNe(String) => Boolean,
         ],

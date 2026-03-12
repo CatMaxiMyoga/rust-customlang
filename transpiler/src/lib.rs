@@ -426,7 +426,8 @@ impl Transpiler {
             }
             Literal::String(value) => {
                 self.output.push_str("new CustomLang.Types.rmm_String(\"");
-                self.output.push_str(&value);
+                self.output
+                    .push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
                 self.output.push_str("\")");
             }
             Literal::Boolean(value) => {

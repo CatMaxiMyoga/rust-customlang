@@ -119,13 +119,19 @@ impl Class {
         parameter_types: &[Type],
         loc: (usize, usize),
     ) -> Result<&Function, SemanticError> {
-        self.methods
-            .get(method_name)
-            .and_then(|methods: &Vec<Function>| {
-                methods
-                    .iter()
-                    .find(|m: &&Function| m.parameters == parameter_types)
-            })
+        let methods: &Vec<Function> =
+            self.methods.get(method_name).ok_or_else(|| SemanticError {
+                error_type: SemanticErrorType::MethodNotFound {
+                    class: self.name.clone(),
+                    method: method_name.into(),
+                },
+                line: loc.0,
+                column: loc.1,
+            })?;
+
+        methods
+            .iter()
+            .find(|m: &&Function| m.parameters == parameter_types)
             .ok_or_else(|| SemanticError {
                 error_type: SemanticErrorType::MethodOverloadNotFound {
                     class: self.name.clone(),

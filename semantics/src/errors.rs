@@ -183,7 +183,7 @@ impl SemanticErrorType {
             Self::VariableAssignmentTypeMismatch { expected, found } => Self::two_var_message(
                 "Tried to assign a value of type",
                 found,
-                "to a variable of type ",
+                "to a variable of type",
                 expected,
                 "",
             ),
@@ -200,14 +200,14 @@ impl SemanticErrorType {
             Self::FieldNotFound { class, field } => Self::two_var_message(
                 "Tried to access field",
                 field,
-                "which does not exist in class ",
+                "which does not exist in class",
                 class,
                 "",
             ),
             Self::MethodNotFound { class, method } => Self::two_var_message(
                 "Tried to access method",
                 method,
-                "which does not exist in class ",
+                "which does not exist in class",
                 class,
                 "",
             ),
@@ -234,7 +234,7 @@ impl SemanticErrorType {
             Self::FieldInitializationTypeMismatch { expected, found } => Self::two_var_message(
                 "Tried to initialize a static field at declaration with a value of type",
                 found,
-                "but the field's declared type is ",
+                "but the field's declared type is",
                 expected,
                 "",
             ),
@@ -267,7 +267,7 @@ impl SemanticErrorType {
             Self::ReturnTypeMismatch { expected, found } => Self::two_var_message(
                 "Tried to return a value of type",
                 found,
-                "but the function's declared return type is ",
+                "but the function's declared return type is",
                 expected,
                 "",
             ),

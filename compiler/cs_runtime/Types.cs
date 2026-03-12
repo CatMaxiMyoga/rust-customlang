@@ -12,6 +12,16 @@ public class rmm_String {
   public rmm_Float rmm_toFloat() => new(double.Parse(value));
 
   public rmm_String rmm__bopAdd(rmm_String other) => new(this.value + other.Inner);
+  public rmm_String rmm__bopMul(rmm_Int other) {
+    string x = "";
+
+    for (int i = 0; i < other.Inner; i++) {
+      x += this.value;
+    }
+
+    return new(x);
+  }
+  public rmm_String rmm__bopDiv(rmm_String other) => new(this.value + "/" + other.Inner);
   public rmm_Bool rmm__bopEq(rmm_String other) => new(this.value == other.Inner);
   public rmm_Bool rmm__bopNe(rmm_String other) => new(this.value != other.Inner);
 }

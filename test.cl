@@ -63,14 +63,14 @@ class X {
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
     /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
-     * Error on line 121 to be fixed. */
+     * Error on line 126 to be fixed. */
     self.x = a;
     Builtin.println("Constructor!");
   }
   
   static Self X(string s) {
     /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
-     * Error on line 121 to be fixed. */
+     * Error on line 126 to be fixed. */
     self.x = s.toInt();
     Builtin.println("Constructor with string!");
   }
@@ -88,6 +88,11 @@ class X {
     return self.x + other.x;
   }
 }
+
+string path = "" / "home" / "someone" / "something.txt";
+Builtin.println(path);
+
+Builtin.println("|" + "´`" * 12 + "|");
 
 X y = X.new("10");
 y.printX();
