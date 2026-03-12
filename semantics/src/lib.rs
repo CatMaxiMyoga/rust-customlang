@@ -105,6 +105,15 @@ impl SemanticAnalyzer {
         loc: (usize, usize),
     ) -> StatementReturn {
         let var_type: Type = Type::from(var_type);
+
+        if var_type == Type::Void {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::IllegalVoidVariable(name.to_string()),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
+
         self.scope.add_variable(name.to_string(), var_type, loc)?;
 
         if let Some(value) = value {
@@ -375,6 +384,14 @@ impl SemanticAnalyzer {
         }
 
         let field_type: Type = Type::from(&field_info.field_type);
+
+        if field_type == Type::Void {
+            return Err(SemanticError {
+                error_type: SemanticErrorType::IllegalVoidField(field_info.name),
+                line: loc.0,
+                column: loc.1,
+            });
+        }
 
         if let Some(value) = field_info.value {
             let value_type: Type = self.expression(value)?;

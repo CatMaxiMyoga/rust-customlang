@@ -63,14 +63,14 @@ class X {
   /* Constructor - called via .new(<args>) */
   static Self X(int a) { 
     /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
-     * Error on line 129 to be fixed. */
+     * Error on line 121 to be fixed. */
     self.x = a;
     Builtin.println("Constructor!");
   }
   
   static Self X(string s) {
     /* TODO: Require all instance-fields to be initialized at the end of constructor. Requires
-     * Error on line 129 to be fixed. */
+     * Error on line 121 to be fixed. */
     self.x = s.toInt();
     Builtin.println("Constructor with string!");
   }
@@ -108,10 +108,6 @@ Builtin.println(Builtin.parseString(y + X.new(5)));
 
 /* NOTE: Missing function error works correctly
  * hehe();
- */
-
-/* FIXME: Allows making variables of type void
- * void x = X.printX();
  */
 
 /* FIXME: Not all code paths have to return a value in a non-void function or method

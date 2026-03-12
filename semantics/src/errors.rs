@@ -143,6 +143,10 @@ pub enum SemanticErrorType {
         /// The given argument types that didn't match any overload of the method.
         argument_types: Vec<String>,
     },
+    /// User tried to declare a variable with type void.
+    IllegalVoidVariable(String),
+    /// User tried to declare a field with type void.
+    IllegalVoidField(String),
 }
 
 impl SemanticErrorType {
@@ -312,6 +316,16 @@ impl SemanticErrorType {
                 argument_types.join(", ").as_str(),
                 "but no overload of the method accepts this.",
             ),
+            Self::IllegalVoidVariable(var) => Self::one_var_message(
+                "Cannot declare variable",
+                var,
+                "because variables cannot have type void",
+            ),
+            Self::IllegalVoidField(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because fields cannot have type void",
+            ),
         }
     }
 
@@ -375,6 +389,8 @@ impl SemanticErrorType {
             Self::MissingReturn => "MissingReturn",
             Self::ArgumentTypeMismatch { .. } => "ArgumentTypeMismatch",
             Self::MethodOverloadNotFound { .. } => "MethodOverloadNotFound",
+            Self::IllegalVoidVariable(_) => "IllegalVoidVariable",
+            Self::IllegalVoidField(_) => "IllegalVoidField",
         }
     }
 }
