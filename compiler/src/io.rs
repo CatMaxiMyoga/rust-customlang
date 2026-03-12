@@ -8,7 +8,7 @@ use std::{
 
 const TEMP_DIR: &str = "__tmp__cs_runtime";
 
-static BUILTINS_FILE: &[u8] = include_bytes!("../cs_runtime/Builtins.cs");
+static BUILTIN_FILE: &[u8] = include_bytes!("../cs_runtime/Builtin.cs");
 static CSPROJ_FILE: &[u8] = include_bytes!("../cs_runtime/cs_runtime.csproj");
 static TYPES_FILE: &[u8] = include_bytes!("../cs_runtime/Types.cs");
 
@@ -35,7 +35,7 @@ pub fn copy_runtime() {
 
     target = dest.join("Builtins.cs");
     if !target.exists() {
-        fs::write(&target, BUILTINS_FILE).expect("Failed to write runtime file");
+        fs::write(&target, BUILTIN_FILE).expect("Failed to write runtime file");
     }
 
     target = dest.join("Types.cs");

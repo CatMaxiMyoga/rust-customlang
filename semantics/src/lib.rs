@@ -47,10 +47,6 @@ impl SemanticAnalyzer {
             analyzer.scope.add_class(class, (0, 0))?;
         }
 
-        for (name, func) in builtins::get_builtin_functions() {
-            analyzer.scope.add_function(name, func[0].clone(), (0, 0))?;
-        }
-
         for statement in ast.statements {
             analyzer.statement(statement, true)?;
         }

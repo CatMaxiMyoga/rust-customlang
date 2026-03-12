@@ -8,23 +8,6 @@ use parser::types::{
 
 use crate::csharp::{Type, prefix};
 
-const BUILTIN_FUNCTIONS: [&str; 14] = [
-    "print",
-    "println",
-    "boolToString",
-    "intToString",
-    "floatToString",
-    "stringToBool",
-    "intToBool",
-    "floatToBool",
-    "stringToInt",
-    "boolToInt",
-    "floatToInt",
-    "stringToFloat",
-    "boolToFloat",
-    "intToFloat",
-];
-
 /// Transpiler struct responsible for transpiling source code into C# code
 #[derive(Debug, Clone)]
 pub struct Transpiler {
@@ -503,12 +486,6 @@ impl Transpiler {
     }
 
     fn function_call_expression(&mut self, callee: Expr, arguments: &[Expr]) -> Result<(), String> {
-        let builtin: bool = if let Expression::Identifier(identifier) = callee.node.clone() {
-            BUILTIN_FUNCTIONS.contains(&identifier.as_str())
-        } else {
-            false
-        };
-
         let constructor_call: Option<String> = if let Expression::MemberAccess { object, member } =
             callee.node.clone()
             && let Expression::Identifier(identifier) = object.node
@@ -519,6 +496,14 @@ impl Transpiler {
             None
         };
 
+        let builtin: bool = if let Expression::MemberAccess { object, .. } = callee.node.clone()
+            && object.node == Expression::Identifier("Builtin".to_string())
+        {
+            true
+        } else {
+            false
+        };
+
         let prefixed_name: String = if let Some(name) = &constructor_call {
             format!("(new {}", prefix(name))
         } else {
@@ -526,7 +511,7 @@ impl Transpiler {
         };
 
         if builtin {
-            self.output.push_str("CustomLang.BuiltinFunctions");
+            self.output.push_str("CustomLang");
             self.output.push('.');
         }
 
@@ -544,6 +529,7 @@ impl Transpiler {
         if constructor_call.is_some() {
             self.output.push(')');
         }
+
         Ok(())
     }
 }

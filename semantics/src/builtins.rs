@@ -41,31 +41,11 @@ macro_rules! functions {
     (@s) => { false };
 }
 
-/// Returns a hashmap of the builtin functions for the global scope <Name, Functions>.
-#[must_use]
-pub fn get_builtin_functions() -> HashMap<String, Vec<Function>> {
-    functions![
-        print(String) => Void,
-        println(String) => Void,
-        boolToString(Boolean) => String,
-        intToString(Int) => String,
-        floatToString(Float) => String,
-        stringToBool(String) => Boolean,
-        intToBool(Int) => Boolean,
-        floatToBool(Float) => Boolean,
-        stringToInt(String) => Int,
-        boolToInt(Boolean) => Int,
-        floatToInt(Float) => Int,
-        stringToFloat(String) => Float,
-        boolToFloat(Boolean) => Float,
-        intToFloat(Int) => Float,
-    ]
-}
-
 /// Returns a vector of the builtin types' class declarations for the global scope.
 #[must_use]
 pub fn get_builtin_types() -> Vec<Class> {
     let classes: Vec<Class> = vec![
+        builtin_builtin(),
         builtin_string(),
         builtin_bool(),
         builtin_int(),
@@ -73,6 +53,40 @@ pub fn get_builtin_types() -> Vec<Class> {
     ];
 
     classes
+}
+
+fn builtin_builtin() -> Class {
+    Class {
+        name: "Builtin".into(),
+        methods: functions![
+            print(String) => Void #static,
+            print(Boolean) => Void #static,
+            print(Int) => Void #static,
+            print(Float) => Void #static,
+
+            println(String) => Void #static,
+            println(Boolean) => Void #static,
+            println(Int) => Void #static,
+            println(Float) => Void #static,
+
+            parseString(Boolean) => String #static,
+            parseString(Int) => String #static,
+            parseString(Float) => String #static,
+
+            parseBool(String) => Boolean #static,
+            parseBool(Int) => Boolean #static,
+            parseBool(Float) => Boolean #static,
+
+            parseInt(String) => Int #static,
+            parseInt(Boolean) => Int #static,
+            parseInt(Float) => Int #static,
+
+            parseFloat(String) => Float #static,
+            parseFloat(Boolean) => Float #static,
+            parseFloat(Int) => Float #static,
+        ],
+        fields: HashMap::new(),
+    }
 }
 
 fn builtin_string() -> Class {
