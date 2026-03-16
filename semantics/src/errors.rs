@@ -1,0 +1,396 @@
+//! Contains the different errors that can come up during semantic analysis
+
+/// Represents an error that can occur during semantic analysis, including the type of error and
+/// the location in the source code where the error occurred.
+pub struct SemanticError {
+    /// The type of semantic error that occurred.
+    pub error_type: SemanticErrorType,
+    /// The line number in the source code where the error occurred.
+    pub line: usize,
+    /// The column number in the source code where the error occurred.
+    pub column: usize,
+}
+
+impl SemanticError {
+    /// Returns the full error message.
+    #[must_use]
+    pub fn error_message(&self) -> String {
+        let mut message: String = String::new();
+
+        message.push_str("SemanticError: ");
+        message.push_str(self.error_type.error_name());
+        message.push_str(" at [");
+        message.push_str(&self.line.to_string());
+        message.push(':');
+        message.push_str(&self.column.to_string());
+        message.push_str("]: ");
+        message.push_str(&self.error_type.message());
+
+        message
+    }
+
+    /// Prints the error message to stderr.
+    pub fn print(&self) {
+        eprintln!("{}", self.error_message());
+    }
+}
+
+/// Represents an error that can occur during semantic analysis, such as type errors or scope
+/// resolution
+pub enum SemanticErrorType {
+    /// User tried to create a function or class with the same name as an existing variable in the
+    /// current scope.
+    ShadowingVariable(String),
+    /// User tried to create a variable or class with the same name as an existing function in the
+    /// current scope.
+    ShadowingFunction(String),
+    /// User tried to create a variable or function with the same name as an existing class in the
+    /// current scope.
+    ShadowingClass(String),
+    /// User tried to access a variable that doesn't exist in the current scope or any parent
+    /// scope.
+    VariableNotFound(String),
+    /// User tried to access a variable that exists but hasn't been initialized yet.
+    VariableUninitialized(String),
+    /// User tried to assign a value of one type to a variable of a different type.
+    VariableAssignmentTypeMismatch {
+        /// The actually expected type of the variable being assigned to.
+        expected: String,
+        /// The type of the value that was being assigned to the variable.
+        found: String,
+    },
+    /// User tried to access a function that doesn't exist in the current scope or any parent
+    /// scope.
+    FunctionNotFound(String),
+    /// User tried to access a class that doesn't exist in the current scope or any parent scope.
+    ClassNotFound(String),
+    /// User tried to access a class' field that doesn't exist in the class definition.
+    FieldNotFound {
+        /// The name of the class that was being accessed.
+        class: String,
+        /// The name of the field that was being accessed inside `class`.
+        field: String,
+    },
+    /// User tried to access a class' method that doesn't exist in the class definition.
+    MethodNotFound {
+        /// The name of the class that was being accessed.
+        class: String,
+        /// The name of the method that was being accessed inside `class`.
+        method: String,
+    },
+    /// User tried to assign to an expression that is not a valid lvalue.
+    InvalidAssignmentTarget(String),
+    /// User tried to assign to an instance field without storing the instance in a variable first,
+    /// which is not allowed.
+    IllegalInstanceFieldAssignment(String),
+    /// User tried to declare a field that already exists in the class.
+    DuplicateField(String),
+    /// User tried to declare a field that has the same name as an already existing method in the
+    /// class.
+    FieldMethodNameConflict(String),
+    /// User tried to initialize a static field at declaration with a value of a different type
+    /// than the field's declared type.
+    FieldInitializationTypeMismatch {
+        /// The actually expected type of the field being initialized to.
+        expected: String,
+        /// The type of the value that was being assigned to the field.
+        found: String,
+    },
+    /// User tried to declare a method that already exists in the class.
+    DuplicateMethod(String),
+    /// User tried to declare a method that has the same name as an already existing field in the
+    /// class.
+    MethodFieldNameConflict(String),
+    /// User used a non-boolean expression as the condition in an if or while statement..
+    NonBooleanCondition(String),
+    /// User tried to declare a function outside global scope, e.g. in an if statement.
+    IllegalFunctionDeclaration(String),
+    /// User tried to declare a class outside global scope, e.g. in an if statement.
+    IllegalClassDeclaration(String),
+    /// User tried to return a value of a different type than the declared return type of the
+    /// function, or tried to return any value in a void-returning function.
+    ReturnTypeMismatch {
+        /// The actually expected return type of the function.
+        expected: String,
+        /// The type of the value that was being returned.
+        found: String,
+    },
+    /// User tried to return outside a function body.
+    IllegalReturn,
+    /// User tried to declare a method with a non-allowed name, e.g. `new`.
+    IllegalMethodName(String),
+    /// Initialization of semantic analyzer threw an error
+    InternalInitializationError(String),
+    /// User declared a class field after declaring a method.
+    FieldAfterMethod(String),
+    /// User didn't return a value in a non-void function or method.
+    MissingReturn,
+    /// User tried to call a function with the wrong argument types.
+    ArgumentTypeMismatch {
+        /// The name of the function that was being called.
+        func: String,
+        /// The expected types of the arguments based on the function's declaration.
+        expected: Vec<String>,
+        /// The actual types of the arguments that were passed in the function call.
+        found: Vec<String>,
+    },
+    /// User tried to call a method with arguments that no overload of the method accepts.
+    MethodOverloadNotFound {
+        /// The class the method belongs to.
+        class: String,
+        /// The name of the method that was being called.
+        method: String,
+        /// The given argument types that didn't match any overload of the method.
+        argument_types: Vec<String>,
+    },
+    /// User tried to declare a variable with type void.
+    IllegalVoidVariable(String),
+    /// User tried to declare a field with type void.
+    IllegalVoidField(String),
+}
+
+impl SemanticErrorType {
+    /// Returns a human-readable error message describing the semantic error.
+    #[allow(clippy::too_many_lines)]
+    #[must_use]
+    pub fn message(&self) -> String {
+        match self {
+            Self::ShadowingVariable(var) => Self::one_var_message(
+                "Cannot declare function or class",
+                var,
+                "because a variable with that name already exists in the current scope",
+            ),
+            Self::ShadowingFunction(func) => Self::one_var_message(
+                "Cannot declare variable or class",
+                func,
+                "because a function with the same name already exists in the current scope",
+            ),
+            Self::ShadowingClass(class) => Self::one_var_message(
+                "Cannot declare variable or function",
+                class,
+                "because a class with the same name already exists in the current scope",
+            ),
+            Self::VariableNotFound(var) => Self::one_var_message(
+                "Tried to access variable",
+                var,
+                "which does not exist in the current or any parent scope",
+            ),
+            Self::VariableUninitialized(var) => Self::one_var_message(
+                "Tried to access variable",
+                var,
+                "which exists but has not been assigned a value yet",
+            ),
+            Self::VariableAssignmentTypeMismatch { expected, found } => Self::two_var_message(
+                "Tried to assign a value of type",
+                found,
+                "to a variable of type",
+                expected,
+                "",
+            ),
+            Self::FunctionNotFound(func) => Self::one_var_message(
+                "Tried to access function",
+                func,
+                "which does not exist in the current or any parent scope",
+            ),
+            Self::ClassNotFound(class) => Self::one_var_message(
+                "Tried to access class",
+                class,
+                "which does not exist in the current or any parent scope",
+            ),
+            Self::FieldNotFound { class, field } => Self::two_var_message(
+                "Tried to access field",
+                field,
+                "which does not exist in class",
+                class,
+                "",
+            ),
+            Self::MethodNotFound { class, method } => Self::two_var_message(
+                "Tried to access method",
+                method,
+                "which does not exist in class",
+                class,
+                "",
+            ),
+            Self::InvalidAssignmentTarget(target) => Self::one_var_message(
+                "Tried to assign to expression",
+                target,
+                "which is not a valid assignment target (lvalue)",
+            ),
+            Self::IllegalInstanceFieldAssignment(field) => Self::one_var_message(
+                "Tried to assign to instance field",
+                field,
+                "without storing the instance in a variable first, which is not allowed",
+            ),
+            Self::DuplicateField(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because a field with the same name already exists in the class",
+            ),
+            Self::FieldMethodNameConflict(name) => Self::one_var_message(
+                "Cannot declare field",
+                name,
+                "because a method with the same name already exists in the class",
+            ),
+            Self::FieldInitializationTypeMismatch { expected, found } => Self::two_var_message(
+                "Tried to initialize a static field at declaration with a value of type",
+                found,
+                "but the field's declared type is",
+                expected,
+                "",
+            ),
+            Self::DuplicateMethod(method) => Self::one_var_message(
+                "Cannot declare method",
+                method,
+                &(String::from("because a method with the same name and parameter types")
+                    + " already exists in the class"),
+            ),
+            Self::MethodFieldNameConflict(name) => Self::one_var_message(
+                "Cannot declare method",
+                name,
+                "because a field with the same name already exists in the class",
+            ),
+            Self::NonBooleanCondition(found) => Self::one_var_message(
+                "Tried to use non-boolean expression of type",
+                found,
+                "as the condition in an if or while statement",
+            ),
+            Self::IllegalFunctionDeclaration(func) => Self::one_var_message(
+                "Cannot declare function",
+                func,
+                "because functions can only be declared in global scope",
+            ),
+            Self::IllegalClassDeclaration(class) => Self::one_var_message(
+                "Cannot declare class",
+                class,
+                "because classes can only be declared in global scope",
+            ),
+            Self::ReturnTypeMismatch { expected, found } => Self::two_var_message(
+                "Tried to return a value of type",
+                found,
+                "but the function's declared return type is",
+                expected,
+                "",
+            ),
+            Self::IllegalReturn => "Tried to return a value outside of a function body".to_string(),
+            Self::IllegalMethodName(name) => Self::one_var_message(
+                "Cannot declare method",
+                name,
+                "because it has a non-allowed name, e.g. 'new'",
+            ),
+            Self::InternalInitializationError(msg) => Self::one_var_message(
+                "Initialization of semantic analyzer failed with error",
+                msg,
+                "",
+            ),
+            Self::FieldAfterMethod(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because fields must be declared before methods in a class",
+            ),
+            Self::MissingReturn => {
+                "Non-void function or method is missing a return statement".to_string()
+            }
+            Self::ArgumentTypeMismatch {
+                func,
+                expected,
+                found,
+            } => Self::three_var_message(
+                "Tried to call function",
+                func,
+                "expecting parameters of type",
+                expected.join(", ").as_str(),
+                "with arguments of type",
+                found.join(", ").as_str(),
+                "",
+            ),
+            Self::MethodOverloadNotFound {
+                class,
+                method,
+                argument_types,
+            } => Self::three_var_message(
+                "Tried to call method",
+                method,
+                "of class",
+                class,
+                "with arguments of type",
+                argument_types.join(", ").as_str(),
+                "but no overload of the method accepts this.",
+            ),
+            Self::IllegalVoidVariable(var) => Self::one_var_message(
+                "Cannot declare variable",
+                var,
+                "because variables cannot have type void",
+            ),
+            Self::IllegalVoidField(field) => Self::one_var_message(
+                "Cannot declare field",
+                field,
+                "because fields cannot have type void",
+            ),
+        }
+    }
+
+    fn one_var_message(p1: &str, v: &str, p2: &str) -> String {
+        format!("{p1} '{v}' {p2}")
+    }
+
+    fn two_var_message(p1: &str, v1: &str, p2: &str, v2: &str, p3: &str) -> String {
+        if p3.is_empty() {
+            format!("{p1} '{v1}' {p2} '{v2}'")
+        } else {
+            format!("{p1} '{v1}' {p2} '{v2}' {p3}")
+        }
+    }
+
+    fn three_var_message(
+        p1: &str,
+        v1: &str,
+        p2: &str,
+        v2: &str,
+        p3: &str,
+        v3: &str,
+        p4: &str,
+    ) -> String {
+        if p4.is_empty() {
+            format!("{p1} '{v1}' {p2} '{v2}' {p3} '{v3}'")
+        } else {
+            format!("{p1} '{v1}' {p2} '{v2}' {p3} '{v3}' {p4}")
+        }
+    }
+
+    /// Returns the name of the error type as a string.
+    #[must_use]
+    pub const fn error_name(&self) -> &'static str {
+        match self {
+            Self::ShadowingVariable(_) => "ShadowingVariable",
+            Self::ShadowingFunction(_) => "ShadowingFunction",
+            Self::ShadowingClass(_) => "ShadowingClass",
+            Self::VariableNotFound(_) => "VariableNotFound",
+            Self::VariableUninitialized(_) => "VariableUninitialized",
+            Self::VariableAssignmentTypeMismatch { .. } => "VariableAssignmentTypeMismatch",
+            Self::FunctionNotFound(_) => "FunctionNotFound",
+            Self::ClassNotFound(_) => "ClassNotFound",
+            Self::FieldNotFound { .. } => "FieldNotFound",
+            Self::MethodNotFound { .. } => "MethodNotFound",
+            Self::InvalidAssignmentTarget(_) => "InvalidAssignmentTarget",
+            Self::IllegalInstanceFieldAssignment(_) => "IllegalInstanceFieldAssignment",
+            Self::DuplicateField(_) => "DuplicateField",
+            Self::FieldMethodNameConflict(_) => "FieldMethodNameConflict",
+            Self::FieldInitializationTypeMismatch { .. } => "FieldInitializationTypeMismatch",
+            Self::DuplicateMethod(_) => "DuplicateMethod",
+            Self::MethodFieldNameConflict(_) => "MethodFieldNameConflict",
+            Self::NonBooleanCondition(_) => "NonBooleanCondition",
+            Self::IllegalFunctionDeclaration(_) => "IllegalFunctionDeclaration",
+            Self::IllegalClassDeclaration(_) => "IllegalClassDeclaration",
+            Self::ReturnTypeMismatch { .. } => "ReturnTypeMismatch",
+            Self::IllegalReturn => "IllegalReturn",
+            Self::IllegalMethodName(_) => "IllegalMethodName",
+            Self::InternalInitializationError(_) => "Internal: InitializationError",
+            Self::FieldAfterMethod(_) => "FieldAfterMethod",
+            Self::MissingReturn => "MissingReturn",
+            Self::ArgumentTypeMismatch { .. } => "ArgumentTypeMismatch",
+            Self::MethodOverloadNotFound { .. } => "MethodOverloadNotFound",
+            Self::IllegalVoidVariable(_) => "IllegalVoidVariable",
+            Self::IllegalVoidField(_) => "IllegalVoidField",
+        }
+    }
+}

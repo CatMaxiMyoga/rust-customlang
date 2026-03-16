@@ -16,6 +16,7 @@ pub struct Parser {
     index: usize,
     outside_global_scope: bool,
     inside_class: Option<String>,
+    inside_method: bool,
     inside_static: bool,
 }
 
@@ -39,6 +40,7 @@ impl Parser {
             index: 0,
             outside_global_scope: false,
             inside_class: None,
+            inside_method: false,
             inside_static: false,
         };
 
@@ -568,7 +570,7 @@ impl Parser {
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
-        if self.inside_class.is_some() {
+        if self.inside_class.is_some() && !self.inside_method {
             return self.parse_field_declaration();
         }
         let token: Token = self.peek()?.clone();
@@ -617,15 +619,34 @@ impl Parser {
         };
         self.advance();
 
-        let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
-        Ok(Spanned {
-            node: Statement::FieldDeclaration {
-                type_,
-                name,
-                static_: self.inside_static,
-            },
-            span: Span { start, end },
-        })
+        let mut value: Option<Expr> = None;
+
+        if self.inside_static {
+            self.expect_token(&TokenKind::Equals)?;
+            value = Some(self.parse_expression()?);
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+
+            Ok(Spanned {
+                node: Statement::FieldDeclaration {
+                    type_,
+                    name,
+                    value,
+                    static_: true,
+                },
+                span: Span { start, end },
+            })
+        } else {
+            let end: (usize, usize) = self.expect_token(&TokenKind::Semicolon)?.end;
+            Ok(Spanned {
+                node: Statement::FieldDeclaration {
+                    type_,
+                    name,
+                    value,
+                    static_: self.inside_static,
+                },
+                span: Span { start, end },
+            })
+        }
     }
 
     fn parse_function_declaration(&mut self) -> Result<Stmt, String> {
@@ -661,20 +682,30 @@ impl Parser {
         self.expect_token(&TokenKind::RightParen)?;
 
         self.expect_token(&TokenKind::LeftBrace)?;
+
         let outside_global_scope_backup: bool = self.outside_global_scope;
         self.outside_global_scope = true;
+        self.inside_method = self.inside_class.is_some();
+
         let mut body: Vec<Stmt> = Vec::new();
         while !self.match_token(&TokenKind::RightBrace) {
             body.push(self.parse_statement()?);
         }
+
         let end: (usize, usize) = self.expect_token(&TokenKind::RightBrace)?.end;
+
         self.outside_global_scope = outside_global_scope_backup;
+        self.inside_method = false;
 
         if self.inside_class.is_some() {
             Ok(Spanned {
                 node: Statement::MethodDeclaration {
                     return_type,
-                    name,
+                    name: if constructor {
+                        self.inside_class.as_ref().expect("checked before").clone()
+                    } else {
+                        name
+                    },
                     parameters,
                     body,
                     static_: self.inside_static && !constructor,

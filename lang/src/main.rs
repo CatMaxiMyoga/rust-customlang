@@ -5,6 +5,7 @@ use std::path::Path;
 use compiler::Compiler;
 use lexer::{Lexer, types::Token};
 use parser::{Parser, types::Program};
+use semantics::SemanticAnalyzer;
 use transpiler::Transpiler;
 
 const LANGUAGE_EXTENSION: &str = "cl";
@@ -27,7 +28,7 @@ OPTIONS:
                            specified. Cannot be used with -o when step is greater than 0.
                              0: All steps (default)
                              1: Lexical Analysis / Tokenization
-                             2: Parsing / AST Generation
+                             2: Parsing / AST Generation + Semantic Analysis
                              3: Transpilation
   -p  --pretty            Pretty-print the output when using -s/--step with a value
                            of either 1 or 2. Not allowed otherwised
@@ -145,6 +146,11 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    SemanticAnalyzer::analyze(program.clone()).unwrap_or_else(|e| {
+        e.print();
+        std::process::exit(1);
+    });
 
     if step == 2 {
         if pretty {

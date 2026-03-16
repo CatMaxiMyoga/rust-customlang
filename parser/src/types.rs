@@ -90,6 +90,22 @@ pub enum Expression {
     Self_,
 }
 
+impl Expression {
+    /// Returns the name of the expression variant.
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        match self {
+            Self::Literal(_) => "Literal",
+            Self::Identifier(_) => "Identifier",
+            Self::Binary { .. } => "Binary",
+            Self::Unary { .. } => "Unary",
+            Self::Call { .. } => "Call",
+            Self::MemberAccess { .. } => "MemberAccess",
+            Self::Self_ => "Self",
+        }
+    }
+}
+
 /// Represents statements in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -108,6 +124,8 @@ pub enum Statement {
         type_: String,
         /// The name of the field.
         name: String,
+        /// The initial value of the field (if static).
+        value: Option<Expr>,
         /// Static field or not.
         static_: bool,
     },
@@ -167,6 +185,25 @@ pub enum Statement {
     Return(Option<Expr>),
     /// An expression statement.
     Expression(Expr),
+}
+
+impl Statement {
+    /// Returns the name of the statement variant.
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        match self {
+            Self::VariableDeclaration { .. } => "VariableDeclaration",
+            Self::FieldDeclaration { .. } => "FieldDeclaration",
+            Self::Assignment { .. } => "Assignment",
+            Self::FunctionDeclaration { .. } => "FunctionDeclaration",
+            Self::ClassDeclaration { .. } => "ClassDeclaration",
+            Self::MethodDeclaration { .. } => "MethodDeclaration",
+            Self::If { .. } => "If",
+            Self::While { .. } => "While",
+            Self::Return(_) => "Return",
+            Self::Expression(_) => "Expression",
+        }
+    }
 }
 
 /// The root node of the AST.

@@ -13,6 +13,7 @@ dependencies = [
  "compiler",
  "lexer",
  "parser",
+ "semantics",
  "transpiler",
 ]
 
@@ -25,6 +26,13 @@ name = "parser"
 version = "0.1.0"
 dependencies = [
  "lexer",
+]
+
+[[package]]
+name = "semantics"
+version = "0.1.0"
+dependencies = [
+ "parser",
 ]
 
 [[package]]

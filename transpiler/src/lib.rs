@@ -8,23 +8,6 @@ use parser::types::{
 
 use crate::csharp::{Type, prefix};
 
-const BUILTIN_FUNCTIONS: [&str; 14] = [
-    "print",
-    "println",
-    "boolToString",
-    "intToString",
-    "floatToString",
-    "stringToBool",
-    "intToBool",
-    "floatToBool",
-    "stringToInt",
-    "boolToInt",
-    "floatToInt",
-    "stringToFloat",
-    "boolToFloat",
-    "intToFloat",
-];
-
 /// Transpiler struct responsible for transpiling source code into C# code
 #[derive(Debug, Clone)]
 pub struct Transpiler {
@@ -106,9 +89,10 @@ impl Transpiler {
                 type_,
                 name,
                 static_,
+                value,
             } => {
                 self.indent();
-                self.field_declaration_statement(&type_, &name, static_);
+                self.field_declaration_statement(&type_, &name, static_, value)?;
             }
             Statement::FunctionDeclaration {
                 return_type,
@@ -185,7 +169,13 @@ impl Transpiler {
         Ok(())
     }
 
-    fn field_declaration_statement(&mut self, type_: &str, name: &str, static_: bool) {
+    fn field_declaration_statement(
+        &mut self,
+        type_: &str,
+        name: &str,
+        static_: bool,
+        value: Option<Expr>,
+    ) -> Result<(), String> {
         let type_: String = Type::from(type_.strip_prefix("##").unwrap_or(type_));
 
         self.output.push_str("public ");
@@ -195,6 +185,13 @@ impl Transpiler {
         self.output.push_str(&type_);
         self.output.push(' ');
         self.output.push_str(&prefix(name));
+
+        if let Some(val) = value {
+            self.output.push_str(" = ");
+            self.expression(val)?;
+        }
+
+        Ok(())
     }
 
     fn variable_assignment_statement(&mut self, assignee: Expr, value: Expr) -> Result<(), String> {
@@ -429,7 +426,8 @@ impl Transpiler {
             }
             Literal::String(value) => {
                 self.output.push_str("new CustomLang.Types.rmm_String(\"");
-                self.output.push_str(&value);
+                self.output
+                    .push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
                 self.output.push_str("\")");
             }
             Literal::Boolean(value) => {
@@ -489,12 +487,6 @@ impl Transpiler {
     }
 
     fn function_call_expression(&mut self, callee: Expr, arguments: &[Expr]) -> Result<(), String> {
-        let builtin: bool = if let Expression::Identifier(identifier) = callee.node.clone() {
-            BUILTIN_FUNCTIONS.contains(&identifier.as_str())
-        } else {
-            false
-        };
-
         let constructor_call: Option<String> = if let Expression::MemberAccess { object, member } =
             callee.node.clone()
             && let Expression::Identifier(identifier) = object.node
@@ -505,6 +497,14 @@ impl Transpiler {
             None
         };
 
+        let builtin: bool = if let Expression::MemberAccess { object, .. } = callee.node.clone()
+            && object.node == Expression::Identifier("Builtin".to_string())
+        {
+            true
+        } else {
+            false
+        };
+
         let prefixed_name: String = if let Some(name) = &constructor_call {
             format!("(new {}", prefix(name))
         } else {
@@ -512,7 +512,7 @@ impl Transpiler {
         };
 
         if builtin {
-            self.output.push_str("CustomLang.BuiltinFunctions");
+            self.output.push_str("CustomLang");
             self.output.push('.');
         }
 
@@ -530,6 +530,7 @@ impl Transpiler {
         if constructor_call.is_some() {
             self.output.push(')');
         }
+
         Ok(())
     }
 }
