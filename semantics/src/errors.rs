@@ -147,6 +147,12 @@ pub enum SemanticErrorType {
     IllegalVoidVariable(String),
     /// User tried to declare a field with type void.
     IllegalVoidField(String),
+    /// User did not declare the "Main" class or the "main" method inside.
+    EntryPointMissing,
+    /// User declared the "main" method with a return type other than 'int'.
+    EntryPointReturnTypeMismatch(String),
+    /// User declared the "main" method as an instance method instead of a static method.
+    EntryPointMustBeStatic,
 }
 
 impl SemanticErrorType {
@@ -326,6 +332,19 @@ impl SemanticErrorType {
                 field,
                 "because fields cannot have type void",
             ),
+            Self::EntryPointMissing => format!(
+                "Did not declare class 'Main' or did not declare method 'main' inside class {}{}",
+                "'Main'. You have to declare a 'Main' class with a 'main()' method as the entry",
+                " point of the program or the program will not run."
+            ),
+            Self::EntryPointReturnTypeMismatch(found) => Self::one_var_message(
+                "Entry point 'main()' method must have return type 'int', found",
+                found,
+                "",
+            ),
+            Self::EntryPointMustBeStatic => {
+                "Entry point 'main()' method must be declared as static".to_string()
+            }
         }
     }
 
@@ -391,6 +410,9 @@ impl SemanticErrorType {
             Self::MethodOverloadNotFound { .. } => "MethodOverloadNotFound",
             Self::IllegalVoidVariable(_) => "IllegalVoidVariable",
             Self::IllegalVoidField(_) => "IllegalVoidField",
+            Self::EntryPointMissing => "EntryPointMissing",
+            Self::EntryPointReturnTypeMismatch(_) => "EntryPointReturnTypeMismatch",
+            Self::EntryPointMustBeStatic => "EntryPointMustBeStatic",
         }
     }
 }

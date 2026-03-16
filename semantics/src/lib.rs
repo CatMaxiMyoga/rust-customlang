@@ -51,7 +51,42 @@ impl SemanticAnalyzer {
             analyzer.statement(statement, true)?;
         }
 
-        Ok(())
+        let main: Class = analyzer
+            .scope
+            .get_class("Main", (0, 0))
+            .map_err(|_| SemanticError {
+                error_type: SemanticErrorType::EntryPointMissing,
+                line: 0,
+                column: 0,
+            })?;
+        let main_method: Function = main
+            .get_method("main", &[], (0, 0))
+            .map_err(|_| SemanticError {
+                error_type: SemanticErrorType::EntryPointMissing,
+                line: 0,
+                column: 0,
+            })?
+            .clone();
+
+        if main_method.return_type == Type::Int {
+            if main_method.is_static {
+                Ok(())
+            } else {
+                Err(SemanticError {
+                    error_type: SemanticErrorType::EntryPointMustBeStatic,
+                    line: 0,
+                    column: 0,
+                })
+            }
+        } else {
+            Err(SemanticError {
+                error_type: SemanticErrorType::EntryPointReturnTypeMismatch(
+                    (&main_method.return_type).into(),
+                ),
+                line: 0,
+                column: 0,
+            })
+        }
     }
 
     fn statement(&mut self, stmt: Stmt, allows_definitions: bool) -> StatementReturn {
@@ -479,7 +514,7 @@ impl SemanticAnalyzer {
         let method: Function = Function {
             parameters: param_types,
             return_type: return_type.clone(),
-            is_static: false,
+            is_static: method_info.static_,
         };
 
         match methods.entry(method_info.name.clone()) {

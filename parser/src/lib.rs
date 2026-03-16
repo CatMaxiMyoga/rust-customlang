@@ -257,6 +257,14 @@ impl Parser {
         expr: &Expr,
         start: (usize, usize),
     ) -> Result<Stmt, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "Member access is not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         let expr: Expr = self.parse_postfix_chain(expr.clone(), start)?;
 
         match self.peek()?.kind.clone() {
@@ -299,6 +307,14 @@ impl Parser {
                 )),
                 Keyword::While => self.parse_while_loop(),
                 Keyword::Return => {
+                    if !self.outside_global_scope {
+                        return Err(format!(
+                            "The 'return' keyword cannot be used in the global scope at {}:{}",
+                            self.peek()?.start.0,
+                            self.peek()?.start.1
+                        ));
+                    }
+
                     let start: (usize, usize) =
                         self.expect_token(&TokenKind::Keyword(Keyword::Return))?.end;
                     let expr: Option<Expr> = if self.match_token(&TokenKind::Semicolon) {
@@ -420,6 +436,14 @@ impl Parser {
     }
 
     fn parse_if_statement(&mut self) -> Result<Stmt, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "The 'if' keyword cannot be used in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         let mut conditional_branches: Vec<(Expr, Vec<Stmt>)> = Vec::new();
         let mut else_branch: Option<Vec<Stmt>> = None;
         let if_token: Token = self.expect_token(&TokenKind::Keyword(Keyword::If))?.clone();
@@ -489,6 +513,14 @@ impl Parser {
     }
 
     fn parse_while_loop(&mut self) -> Result<Stmt, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "The 'while' keyword cannot be used in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         let while_loop: Token = self
             .expect_token(&TokenKind::Keyword(Keyword::While))?
             .clone();
@@ -572,6 +604,12 @@ impl Parser {
     fn parse_variable_declaration(&mut self) -> Result<Stmt, String> {
         if self.inside_class.is_some() && !self.inside_method {
             return self.parse_field_declaration();
+        } else if !self.outside_global_scope {
+            return Err(format!(
+                "Variable declarations are not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
         }
         let token: Token = self.peek()?.clone();
         let type_: String = match &token.kind {
@@ -778,6 +816,14 @@ impl Parser {
         name: Box<Expr>,
         start: (usize, usize),
     ) -> Result<Stmt, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "Assignments are not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         self.expect_token(&TokenKind::Equals)?;
 
         let value: Expr = self.parse_expression()?;
@@ -796,6 +842,14 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Result<Stmt, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "Assignments are not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         let token: Token = self.peek()?.clone();
         self.advance();
         self.parse_named_assignment(
@@ -814,6 +868,14 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Result<Expr, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "Expressions are not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         self.parse_precedence(0, false)
     }
 
@@ -1039,6 +1101,14 @@ impl Parser {
         callee: Box<Expr>,
         start: (usize, usize),
     ) -> Result<Expr, String> {
+        if !self.outside_global_scope {
+            return Err(format!(
+                "Expressions are not allowed in the global scope at {}:{}",
+                self.peek()?.start.0,
+                self.peek()?.start.1
+            ));
+        }
+
         let mut arguments: Vec<Expr> = Vec::new();
 
         if !self.match_token(&TokenKind::RightParen) {

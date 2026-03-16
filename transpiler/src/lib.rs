@@ -31,9 +31,24 @@ impl Transpiler {
             class_declarations: String::new(),
         };
 
+        transpiler.output.push_str("// ENTRY POINT\n");
+        transpiler
+            .output
+            .push_str("return rmm_Main.rmm_main().Inner;\n\n\n");
+        transpiler.output.push_str("// USER FUNCTIONS\n\n");
+
+        transpiler
+            .output
+            .push_str("public partial class Program {\n");
+        transpiler.indent_level += 1;
+
         for statement in program.statements {
             transpiler.statement(statement)?;
         }
+
+        transpiler.indent_level -= 1;
+        transpiler.output = String::from(transpiler.output.trim_end());
+        transpiler.output.push_str("\n}\n");
 
         transpiler.output.push_str("\n\n// CLASS DECLARATIONS\n\n");
         transpiler.output.push_str(&transpiler.class_declarations);
@@ -209,6 +224,7 @@ impl Transpiler {
         params: &[(String, String)],
         body: Vec<Stmt>,
     ) -> Result<(), String> {
+        self.output.push_str("public static ");
         self.output.push_str(&Type::from(return_type));
         self.output.push(' ');
         self.output.push_str(&prefix(name));
@@ -505,6 +521,8 @@ impl Transpiler {
             false
         };
 
+        let ident: bool = matches!(callee.node, Expression::Identifier(_));
+
         let prefixed_name: String = if let Some(name) = &constructor_call {
             format!("(new {}", prefix(name))
         } else {
@@ -512,8 +530,9 @@ impl Transpiler {
         };
 
         if builtin {
-            self.output.push_str("CustomLang");
-            self.output.push('.');
+            self.output.push_str("CustomLang.");
+        } else if ident {
+            self.output.push_str("Program.");
         }
 
         self.output.push_str(&prefixed_name);

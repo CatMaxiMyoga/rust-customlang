@@ -11,6 +11,7 @@ public static class rmm_Builtin {
   public static void rmm_print(rmm_Int i) => rmm_print(i.rmm_toString());
   public static void rmm_print(rmm_Float f) => rmm_print(f.rmm_toString());
 
+  public static void rmm_println() => System.Console.WriteLine();
   public static void rmm_println(rmm_String s) => System.Console.WriteLine(s.ToString());
   public static void rmm_println(rmm_Bool b) => rmm_println(b.rmm_toString());
   public static void rmm_println(rmm_Int i) => rmm_println(i.rmm_toString());
