@@ -1,8 +1,8 @@
 class G {
   static void print(string s) { Builtin.print(s); Builtin.print(" "); }
-  static void print(bool b) { Builtin.print(b); Builtin.print(" "); }
-  static void print(int i) { Builtin.print(i); Builtin.print(" "); }
-  static void print(float f) { Builtin.print(f); Builtin.print(" "); }
+  static void print(bool b) { G.print(b.toString()); }
+  static void print(int i) { G.print(i.toString()); }
+  static void print(float f) { G.print(f.toString()); }
 }
 
 class X {
@@ -45,25 +45,25 @@ class Main {
     G.print(1 > 2);
     G.print(4 != 4);
     G.print(2 + 2 == 4);
-    Builtin.println("");
+    Builtin.println();
 
     G.print(0);
     G.print(7);
     G.print(10-15);
     G.print((5+5)/3);
-    Builtin.println("");
+    Builtin.println();
 
     G.print(0.0);
     G.print(3.14);
     G.print(1.0/3.0);
     G.print(.25*4.0);
-    Builtin.println("");
+    Builtin.println();
 
     G.print(true || false && false);
     G.print(!true);
     G.print(true && !false);
     G.print((true || false) && false);
-    Builtin.println("");
+    Builtin.println();
 
     bool a = false;
     bool b = false;
@@ -78,7 +78,7 @@ class Main {
       i = i + 1;
     }
 
-    Builtin.println("");
+    Builtin.println();
 
     G.print(Builtin.parseBool(""));
     G.print(Builtin.parseBool(0));
@@ -87,7 +87,7 @@ class Main {
     G.print(Builtin.parseBool(3));
     G.print(Builtin.parseBool(2.5));
 
-    Builtin.println("");
+    Builtin.println();
 
     string path = "" / "home" / "someone" / "something.txt";
     Builtin.println(path);
